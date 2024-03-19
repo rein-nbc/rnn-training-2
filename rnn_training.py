@@ -21,6 +21,8 @@ import dill
 import tensorflow as tf
 
 VAL_PERCENT = 20
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+
 
 def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
@@ -306,8 +308,8 @@ def main():
       text += "\n"
   
     train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
-    with open(os.path.join(), 'wb') as f:
-        dill.dump(ids_from_chars, f)
+    # with open(os.path.join(), 'wb') as f:
+    #     dill.dump(ids_from_chars, f)
     
     vocab_size = len(ids_from_chars.get_vocabulary())
     model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir)
