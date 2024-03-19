@@ -94,8 +94,7 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
     
     model.add(tf.keras.layers.Embedding(
         input_dim=vocab_size,
-        output_dim=embedding_dim,
-        batch_input_shape=[batch_size, None]
+        output_dim=embedding_dim    
     ))
     
     model.add(tf.keras.layers.LSTM(
