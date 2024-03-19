@@ -17,14 +17,9 @@ import struct
 import base64
 import argparse
 import tempfile 
-import dill
 import tensorflow as tf
 
 VAL_PERCENT = 20
-
-print(tf.test.gpu_device_name())
-config = tf.ConfigProto()
-config.gpu_options.allow_growth = True
 
 
 def parse_args():
@@ -161,7 +156,8 @@ def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_check
     model = build_model(vocab_size, embedding_dim, rnn_units, batch_size)
     # load pretrained weights
     if pretrained_checkpoint_dir is not None:
-        model.load_weights(tf.train.latest_checkpoint(pretrained_checkpoint_dir))
+        checkpoint_path = os.path.join(pretrained_checkpoint_dir, "best.hdf5")
+        model.load_weights(checkpoint_path)
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     model.compile(optimizer='adam', loss=loss)
     return model
@@ -311,8 +307,6 @@ def main():
       text += "\n"
   
     train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
-    # with open(os.path.join(), 'wb') as f:
-    #     dill.dump(ids_from_chars, f)
     
     vocab_size = len(ids_from_chars.get_vocabulary())
     model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir)
@@ -321,7 +315,11 @@ def main():
 
     model.summary()
 
-    model.load_weights(tf.train.latest_checkpoint(checkpoint_dir))
+    model.load_weights(os.path.join(checkpoint_dir, "best.hdf5"))
+    # save ids_from_chars
+    with open(os.path.join(checkpoint_dir, "ids_from_chars.json"), "w") as f:
+        json.dump(ids_from_chars.get_vocabulary(), f)
+        
     weight_base64, compressed_config = get_model_for_export(model)
 
     inscription = {
