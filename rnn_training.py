@@ -304,9 +304,9 @@ def main():
   
     train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
 
-    with open('./checkpoints/dictionary.json', 'r') as f:
+    with open(os.path.join(pretrained_checkpoint_dir, 'dictionary.json'), 'r') as f:
         vocabulary = json.load(f)
-        
+
     vocab_size = len(vocabulary)
     model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir)
 
