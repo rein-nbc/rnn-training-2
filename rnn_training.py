@@ -155,7 +155,7 @@ def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_check
     model = build_model(vocab_size, embedding_dim, rnn_units, batch_size)
     # load pretrained weights
     if pretrained_checkpoint_dir is not None:
-        checkpoint_path = os.path.join(pretrained_checkpoint_dir, "best.hdf5")
+        checkpoint_path = os.path.join(pretrained_checkpoint_dir, "best.h5")
         model.load_weights(checkpoint_path)
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     model.compile(optimizer='adam', loss=loss)
