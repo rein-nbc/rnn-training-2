@@ -155,7 +155,7 @@ def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_check
     model = build_model(vocab_size, embedding_dim, rnn_units, batch_size)
     # load pretrained weights
     if pretrained_checkpoint_dir is not None:
-        checkpoint_path = os.path.join(pretrained_checkpoint_dir, "best.h5")
+        checkpoint_path = os.path.join(pretrained_checkpoint_dir, "best.weights.h5")
         model.load_weights(checkpoint_path)
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     model.compile(optimizer='adam', loss=loss)
@@ -165,7 +165,7 @@ def train_model(model, train_ds, val_ds, checkpoint_dir, epochs):
     # Name of the checkpoint files
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath = os.path.join(checkpoint_dir, "best.h5"),
+        filepath = os.path.join(checkpoint_dir, "best.weights.h5"),
         save_weights_only=True,
         save_best_only=True,  # Only save the best model based on validation loss
         monitor='val_loss',
@@ -315,7 +315,7 @@ def main():
 
     model.summary()
 
-    model.load_weights(os.path.join(checkpoint_dir, "best.h5"))
+    model.load_weights(os.path.join(checkpoint_dir, "best.weights.h5"))
     # save ids_from_chars
     with open(os.path.join(checkpoint_dir, "ids_from_chars.json"), "w") as f:
         json.dump(ids_from_chars.get_vocabulary(), f)
