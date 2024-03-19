@@ -313,7 +313,10 @@ def main():
   rnn_units = config["rnn_units"]
   batch_size = config["batch_size"]
   seq_length = config["seq_length"]
-  checkpoint_dir = './checkpoints'
+
+  # checkpoint_dir = None
+  # if os.path.exists("./checkpoints"):
+  checkpoint_dir = "./checkpoints"
 
   temperature = 0.7
   prompt = 'ROMEO:\nIs the day so young?'
