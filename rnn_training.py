@@ -22,6 +22,10 @@ import tensorflow as tf
 
 VAL_PERCENT = 20
 
+print(tf.test.gpu_device_name())
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+
 
 def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
@@ -164,19 +168,15 @@ def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_check
 
 def train_model(model, train_ds, val_ds, checkpoint_dir, epochs):
     # Name of the checkpoint files
-    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt_{epoch}")
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=checkpoint_prefix,
+        filepath = os.path.join(checkpoint_dir, "best.hdf5"),
         save_weights_only=True,
         save_best_only=True,  # Only save the best model based on validation loss
         monitor='val_loss',
         mode='min'
     )
-    # Enable GPU training
-    physical_devices = tf.config.list_physical_devices('cuda:0')
-    tf.config.experimental.set_memory_growth(physical_devices[0], True)
-    with tf.device('/GPU:0'):
+    with tf.device('/gpu:0'):
         model.fit(train_ds, epochs=epochs, validation_data=val_ds, callbacks=[checkpoint_callback, early_stopping])
 
 def compressConfig(data):
