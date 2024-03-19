@@ -26,6 +26,7 @@ def parse_args():
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
     parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
     parser.add_argument("--output-path", type=str, default = "output.json", help="Path to the output file")
+    parser.add_argument("--pretrained-checkpoint-dir", type =str, default = None, help="Path to the checkpoint directory")
     return parser.parse_args()
 
 def get_file_content(file_path):
@@ -284,6 +285,7 @@ def main():
     config_path = args.config_path
     data_dir = args.data_dir
     output_path = args.output_path
+    pretrained_checkpoint_dir = args.pretrained_checkpoint_dir
 
     with open(config_path, "r") as f:
         config = json.load(f)
@@ -292,7 +294,6 @@ def main():
     batch_size = config["batch_size"]
     seq_length = config["seq_length"]
     epochs = config["epoch_num"]
-    pretrained_checkpoint_dir = './checkpoints'
 
     tmp_checkpoint_dir = tempfile.mkdtemp()
     datasets = glob.glob(os.path.join(data_dir, "*"))
@@ -305,6 +306,7 @@ def main():
 
     with open('./checkpoints/dictionary.json', 'r') as f:
         vocabulary = json.load(f)
+        
     vocab_size = len(vocabulary)
     model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir)
 
