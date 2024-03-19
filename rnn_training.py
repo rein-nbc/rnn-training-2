@@ -315,7 +315,7 @@ def main():
 
     model.summary()
 
-    model.load_weights(os.path.join(checkpoint_dir, "best.hdf5"))
+    model.load_weights(os.path.join(checkpoint_dir, "best.h5"))
     # save ids_from_chars
     with open(os.path.join(checkpoint_dir, "ids_from_chars.json"), "w") as f:
         json.dump(ids_from_chars.get_vocabulary(), f)
