@@ -27,6 +27,7 @@ def parse_args():
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
     parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
     parser.add_argument("--output-path", type=str, default = "output.json", help="Path to the output file")
+    parser.add_argument("--pretrained-checkpoint-dir", type=str, default = None, help="Path to the pretrained checkpoint directory")
     return parser.parse_args()
 
 def get_file_content(file_path):
@@ -161,17 +162,17 @@ def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_check
     return model
 
 def train_model(model, train_ds, val_ds, checkpoint_dir, epochs):
-  # Name of the checkpoint files
-  checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt_{epoch}")
-  early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
-  checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+    # Name of the checkpoint files
+    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt_{epoch}")
+    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_prefix,
         save_weights_only=True,
-        save_best_only=True,
+        save_best_only=True,  # Only save the best model based on validation loss
         monitor='val_loss',
         mode='min'
     )
-  model.fit(train_ds, epochs=epochs, validation_data=val_ds, callbacks=[checkpoint_callback, early_stopping])
+    model.fit(train_ds, epochs=epochs, validation_data=val_ds, callbacks=[checkpoint_callback, early_stopping])
 
 def compressConfig(data):
     layers = []
@@ -295,12 +296,9 @@ def main():
     seq_length = config["seq_length"]
     epochs = config["epoch_num"]
 
-    pretrained_checkpoint_dir = None
-    if os.path.exists("./checkpoints"):
-        pretrained_checkpoint_dir = "./checkpoints"
+    pretrained_checkpoint_dir = args.pretrained_checkpoint_dir
 
-    tmp_checkpoint_dir = './pretrained_checkpoints'
-    # tmp_checkpoint_dir = tempfile.mkdtemp()
+    checkpoint_dir = './checkpoints'
     datasets = glob.glob(os.path.join(data_dir, "*"))
     text = ""
     for dataset in datasets:
@@ -308,17 +306,17 @@ def main():
       text += "\n"
   
     train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
-    with open('./pretrained_checkpoints/dictionary.dill', 'wb') as f:
+    with open(os.path.join(), 'wb') as f:
         dill.dump(ids_from_chars, f)
     
     vocab_size = len(ids_from_chars.get_vocabulary())
     model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir)
 
-    train_model(model, train_ds, val_ds, tmp_checkpoint_dir, epochs)
+    train_model(model, train_ds, val_ds, checkpoint_dir, epochs)
 
     model.summary()
 
-    model.load_weights(tf.train.latest_checkpoint(tmp_checkpoint_dir))
+    model.load_weights(tf.train.latest_checkpoint(checkpoint_dir))
     weight_base64, compressed_config = get_model_for_export(model)
 
     inscription = {
