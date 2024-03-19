@@ -172,7 +172,8 @@ def train_model(model, train_ds, val_ds, checkpoint_dir, epochs):
         monitor='val_loss',
         mode='min'
     )
-    with tf.device('/gpu:0'):
+    # Enable GPU training
+    with tf.device('/physical_device:GPU:0'):
         model.fit(train_ds, epochs=epochs, validation_data=val_ds, callbacks=[checkpoint_callback, early_stopping])
 
 def compressConfig(data):
@@ -319,7 +320,7 @@ def main():
     # save ids_from_chars
     with open(os.path.join(checkpoint_dir, "ids_from_chars.json"), "w") as f:
         json.dump(ids_from_chars.get_vocabulary(), f)
-        
+
     weight_base64, compressed_config = get_model_for_export(model)
 
     inscription = {
