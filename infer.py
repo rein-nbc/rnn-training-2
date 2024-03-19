@@ -8,12 +8,17 @@ Original file is located at
 """
 
 import tensorflow as tf
-
-import numpy as np
 import os
 import time
 import json
+import argparse
+import glob
 
+def parse_args():
+    parser = argparse.ArgumentParser("Entry script to launch inference")
+    parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
+    parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
+    return parser.parse_args()
 
 def get_file_content(file_path):
   with open(file_path, "r") as f:
@@ -27,13 +32,18 @@ def write_to_file(file_path, content):
   f.close()
 
 
-def get_text_from_file():
-  path_to_file = tf.keras.utils.get_file('shakespeare.txt', 'https://storage.googleapis.com/download.tensorflow.org/data/shakespeare.txt')
-
-  # Read, then decode for py2 compat.
-  text = open(path_to_file, 'rb').read().decode(encoding='utf-8')
-
+def get_text_from_dataset(dir):
+  data_paths = glob.glob(os.path.join(dir, "*.txt"))
+  def get_text_from_file(file_path):
+      # Read, then decode for py2 compat.
+      text = open(file_path, 'rb').read().decode(encoding='utf-8')
+      return text
+  text = ""
+  for data_path in data_paths:
+      text += get_text_from_file(data_path)
+      text += "\n"
   return text
+
 
 
 def create_dataset_from_text(text, batch_size, seq_length):
@@ -211,26 +221,28 @@ def test_model(model, chars_from_ids, ids_from_chars, prompt, temperature=1.0):
 
 
 def main():
+  args = parse_args()
   # The embedding dimension
-  embedding_dim = 32
-  # Number of RNN units
-  rnn_units = 128
-  # Directory where the checkpoints will be saved
-  checkpoint_dir = './training_checkpoints'  
-  # # The embedding dimension
-  # embedding_dim = 256
-  # # Number of RNN units
-  # rnn_units = 1024
-  # # Directory where the checkpoints will be saved
-  # checkpoint_dir = './training_checkpoints_2'  
-  temperature = 0.5
+  config_path = args.config_path
+  data_dir = args.data_dir
+
+  with open(config_path, "r") as f:
+      config = json.load(f)
+
+  embedding_dim = config["embedding_dim"]
+  rnn_units = config["rnn_units"]
+  batch_size = config["batch_size"]
+  seq_length = config["seq_length"]
+  checkpoint_dir = './checkpoints'
+
+  temperature = 0.7
   prompt = 'ROMEO:\nIs the day so young?'
-  # prompt = 'First Citizen:\nSoft! who comes here?'
 
-  batch_size = 128  
-  seq_length = 100
-
-  text = get_text_from_file()
+  datasets = glob.glob(os.path.join(data_dir, "*"))
+  text = ""
+  for dataset in datasets:
+    text += get_text_from_dataset(dataset)
+    text += "\n"
 
   dataset, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
 
@@ -240,11 +252,6 @@ def main():
   model = build_model(vocab_size, embedding_dim, rnn_units, batch_size=1)
   model.load_weights(tf.train.latest_checkpoint(checkpoint_dir))
   test_model(model, chars_from_ids, ids_from_chars, prompt, temperature)
-
-  data = json.loads(model.to_json())
-
-  # config = data["config"]["layers"]
-  # write_to_file("model_config.json", model.to_json())
 
 
 main()  

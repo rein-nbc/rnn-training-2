@@ -160,11 +160,13 @@ def train_model(model, train_ds, val_ds, checkpoint_dir, epochs):
   # Name of the checkpoint files
   checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt_{epoch}")
   early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
-
   checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-      filepath=checkpoint_prefix,
-      save_weights_only=True
-  )
+        filepath=checkpoint_prefix,
+        save_weights_only=True,
+        save_best_only=True,
+        monitor='val_loss',
+        mode='min'
+    )
   model.fit(train_ds, epochs=epochs, validation_data=val_ds, callbacks=[checkpoint_callback, early_stopping])
 
 def compressConfig(data):
@@ -288,8 +290,8 @@ def main():
     batch_size = config["batch_size"]
     seq_length = config["seq_length"]
     epochs = config["epoch_num"]
-    
-    tmp_checkpoint_dir = tempfile.mkdtemp()
+    tmp_checkpoint_dir = './checkpoints'   
+    # tmp_checkpoint_dir = tempfile.mkdtemp()
     datasets = glob.glob(os.path.join(data_dir, "*"))
     text = ""
     for dataset in datasets:
