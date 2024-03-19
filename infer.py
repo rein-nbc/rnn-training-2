@@ -44,6 +44,86 @@ def get_text_from_dataset(dir):
       text += "\n"
   return text
 
+import struct
+import base64
+
+def compressConfig(data):
+    layers = []
+    for layer in data["config"]["layers"]:
+        cfg = layer["config"]
+        layer_config = None
+        if layer["class_name"] == "InputLayer":
+            layer_config = {
+                "batch_input_shape": cfg["batch_input_shape"]
+            }
+        elif layer["class_name"] == "Rescaling":
+            layer_config = {
+                "scale": cfg["scale"],
+                "offset": cfg["offset"]
+            }
+        elif layer["class_name"] == "Dense":
+            layer_config = {
+                "units": cfg["units"],
+                "activation": cfg["activation"]
+            }
+        elif layer["class_name"] == "Conv2D":
+            layer_config = {
+                "filters": cfg["filters"],
+                "kernel_size": cfg["kernel_size"],
+                "strides": cfg["strides"],
+                "activation": cfg["activation"],
+                "padding": cfg["padding"]
+            }
+        elif layer["class_name"] == "MaxPooling2D":
+            layer_config = {
+                "pool_size": cfg["pool_size"],
+                "strides": cfg["strides"],
+                "padding": cfg["padding"]
+            }
+        elif layer["class_name"] == "Embedding":
+            layer_config = {
+                "input_dim": cfg["input_dim"],
+                "output_dim": cfg["output_dim"]
+            }
+        elif layer["class_name"] == "SimpleRNN":
+            layer_config = {
+                "units": cfg["units"],
+                "activation": cfg["activation"]
+            }
+        elif layer["class_name"] == "LSTM":
+            layer_config = {
+                "units": cfg["units"],
+                "activation": cfg["activation"],
+                "recurrent_activation": cfg["recurrent_activation"]
+            }
+        res_layer = {
+            "class_name": layer["class_name"],
+        }
+        if layer_config is not None:
+            res_layer["config"] = layer_config
+        layers.append(res_layer)
+
+    return {
+        "config": {
+            "layers": layers
+        }
+    }
+
+def get_model_for_export(model):
+    weight_np = model.get_weights()
+
+    weight_bytes = bytearray()
+    for idx, layer in enumerate(weight_np):
+        # write_to_file(os.path.join(model_output_dir, f"model_weight_{idx:02}.txt"), str(layer))
+        flatten = layer.reshape(-1).tolist()
+        flatten_packed = map(lambda i: struct.pack("@f", i), flatten)
+        for i in flatten_packed:
+            weight_bytes.extend(i)
+
+    weight_base64 = base64.b64encode(weight_bytes).decode()
+    config = json.loads(model.to_json())
+    compressed_config = compressConfig(config)
+    return weight_base64, compressed_config
 
 
 def create_dataset_from_text(text, batch_size, seq_length):
@@ -252,6 +332,17 @@ def main():
   model = build_model(vocab_size, embedding_dim, rnn_units, batch_size=1)
   model.load_weights(tf.train.latest_checkpoint(checkpoint_dir))
   test_model(model, chars_from_ids, ids_from_chars, prompt, temperature)
+  
+  weight_base64, compressed_config = get_model_for_export(model)
+
+  inscription = {
+      "model_name": "RNN",
+      "layers_config": compressed_config,
+      "vocabulary": ids_from_chars.get_vocabulary(),
+      "weight_b64": weight_base64
+  } 
+  inscription_json = json.dumps(inscription)
+  write_to_file('model.json', inscription_json)
 
 
 main()  

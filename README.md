@@ -6,15 +6,11 @@ Config file format
 {
   "embedding_dim": 32,
   "rnn_units": 128,
-  "batch_size": 128,
-  "epoch_num": 10,
+  "batch_size": 512,
+  "epoch_num": 30,
   "seq_length": 30
 }
 ```
-- ``embedding_dim``: should be in range [32, 512].
-- ``rnn_units``: should be in range [32, 512].
-- ``epoch_num``: Optional (should be maximum 100).
-- ``seq_length``: Optional (should be in range [20, 30]).
 
 ## Running command
 

@@ -19,7 +19,7 @@ import argparse
 import tempfile 
 import tensorflow as tf
 
-VAL_PERCENT = 10
+VAL_PERCENT = 20
 
 def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
@@ -150,8 +150,10 @@ class OneStep():
         # Return the characters and model state.
         return predicted_chars
 
-def get_model(vocab_size, embedding_dim, rnn_units, batch_size):
+def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir):
     model = build_model(vocab_size, embedding_dim, rnn_units, batch_size)
+    # load pretrained weights
+    model.load_weights(tf.train.latest_checkpoint(pretrained_checkpoint_dir))
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     model.compile(optimizer='adam', loss=loss)
     return model
@@ -290,8 +292,9 @@ def main():
     batch_size = config["batch_size"]
     seq_length = config["seq_length"]
     epochs = config["epoch_num"]
-    tmp_checkpoint_dir = './checkpoints'   
-    # tmp_checkpoint_dir = tempfile.mkdtemp()
+    pretrained_checkpoint_dir = './checkpoints'
+
+    tmp_checkpoint_dir = tempfile.mkdtemp()
     datasets = glob.glob(os.path.join(data_dir, "*"))
     text = ""
     for dataset in datasets:
@@ -300,25 +303,22 @@ def main():
   
     train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
 
-    # Length of the vocabulary in StringLookup Layer
-    vocab_size = len(ids_from_chars.get_vocabulary())
-
-    model = get_model(vocab_size, embedding_dim, rnn_units, batch_size)
+    with open('./checkpoints/dictionary.json', 'r') as f:
+        vocabulary = json.load(f)
+    vocab_size = len(vocabulary)
+    model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir)
 
     train_model(model, train_ds, val_ds, tmp_checkpoint_dir, epochs)
 
     model.summary()
 
-    model = build_model(vocab_size, embedding_dim, rnn_units, batch_size=1)
     model.load_weights(tf.train.latest_checkpoint(tmp_checkpoint_dir))
-    test_model(model, chars_from_ids, ids_from_chars)
-
     weight_base64, compressed_config = get_model_for_export(model)
 
     inscription = {
         "model_name": "RNN",
         "layers_config": compressed_config,
-        "vocabulary": ids_from_chars.get_vocabulary(),
+        "vocabulary": vocabulary,
         "weight_b64": weight_base64
     }
     inscription_json = json.dumps(inscription)
