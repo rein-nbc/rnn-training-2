@@ -165,7 +165,7 @@ def train_model(model, train_ds, val_ds, checkpoint_dir, epochs):
     # Name of the checkpoint files
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath = os.path.join(checkpoint_dir, "best.hdf5"),
+        filepath = os.path.join(checkpoint_dir, "best.h5"),
         save_weights_only=True,
         save_best_only=True,  # Only save the best model based on validation loss
         monitor='val_loss',
