@@ -21,7 +21,6 @@ import dill
 import tensorflow as tf
 
 VAL_PERCENT = 20
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
 
 def parse_args():
@@ -174,7 +173,12 @@ def train_model(model, train_ds, val_ds, checkpoint_dir, epochs):
         monitor='val_loss',
         mode='min'
     )
-    model.fit(train_ds, epochs=epochs, validation_data=val_ds, callbacks=[checkpoint_callback, early_stopping])
+    # Enable GPU training
+    physical_devices = tf.config.list_physical_devices('GPU')
+    print(physical_devices)
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    with tf.device('/GPU:0'):
+        model.fit(train_ds, epochs=epochs, validation_data=val_ds, callbacks=[checkpoint_callback, early_stopping])
 
 def compressConfig(data):
     layers = []
