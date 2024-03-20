@@ -172,7 +172,7 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
   model = tf.keras.models.Sequential()
 
   model.add(tf.keras.layers.Embedding(
-    input_dim=vocab_size,
+    input_dim=156,
     output_dim=embedding_dim,
     batch_input_shape=[batch_size, None]
   ))
@@ -182,33 +182,11 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
     return_sequences=True,
     stateful=True,
   ))
+  model.add(tf.keras.layers.Dense(156))
 
   model.add(tf.keras.layers.Dense(vocab_size))
 
   return model
-
-
-# class MyModel(tf.keras.Model):
-#   def __init__(self, vocab_size, embedding_dim, rnn_units):
-#     super().__init__(self)
-#     self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-#     self.gru = tf.keras.layers.GRU(rnn_units,
-#                                   return_sequences=True,
-#                                   return_state=True)
-#     self.dense = tf.keras.layers.Dense(vocab_size)
-
-#   def call(self, inputs, states=None, return_state=False, training=False):
-#     x = inputs
-#     x = self.embedding(x, training=training)
-#     if states is None:
-#       states = self.gru.get_initial_state(x)
-#     x, states = self.gru(x, initial_state=states, training=training)
-#     x = self.dense(x, training=training)
-
-#     if return_state:
-#       return x, states
-#     else:
-#       return x
 
 
 class OneStep(tf.keras.Model):
@@ -289,7 +267,7 @@ def test_model(model, chars_from_ids, ids_from_chars, prompt, temperature=1.0):
   next_char = tf.constant([prompt])
   result = [next_char]
 
-  for n in range(1000):
+  for n in range(100):
     next_char = one_step_model.generate_one_step(next_char)
     result.append(next_char)
 
@@ -316,7 +294,7 @@ def main():
   checkpoint_dir = './checkpoints'
 
   temperature = 0.7
-  prompt = 'ROMEO:\nIs the day so young?'
+  prompt = 'Nice day'
 
   datasets = glob.glob(os.path.join(data_dir, "*"))
   text = ""
@@ -330,7 +308,7 @@ def main():
   vocab_size = len(ids_from_chars.get_vocabulary())
 
   model = build_model(vocab_size, embedding_dim, rnn_units, batch_size=1)
-  model.load_weights(tf.train.latest_checkpoint(checkpoint_dir))
+  model.load_weights(os.path.join(checkpoint_dir, "best.hdf5"))
   test_model(model, chars_from_ids, ids_from_chars, prompt, temperature)
   
   weight_base64, compressed_config = get_model_for_export(model)

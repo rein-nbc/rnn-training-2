@@ -26,7 +26,7 @@ def parse_args():
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
     parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
     parser.add_argument("--output-path", type=str, default = "output.json", help="Path to the output file")
-    parser.add_argument("--pretrained-checkpoint-dir", type =str, default = None, help="Path to the checkpoint directory")
+    parser.add_argument("--checkpoint-path", type =str, default=None, help="Path to the checkpoint file")
     return parser.parse_args()
 
 def get_file_content(file_path):
@@ -88,11 +88,11 @@ def create_dataset_from_text(text, batch_size, seq_length, val_percent=VAL_PERCE
 
   return train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids
 
-def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
+def build_model(vocab_size, embedding_dim, rnn_units, batch_size, checkpoint_path = None):
     model = tf.keras.models.Sequential()
-    
+
     model.add(tf.keras.layers.Embedding(
-        input_dim=vocab_size,
+        input_dim=156,
         output_dim=embedding_dim,
         batch_input_shape=[batch_size, None]
     ))
@@ -102,9 +102,10 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
         return_sequences=True,
         stateful=True,
     ))
-    
+    model.add(tf.keras.layers.Dense(156))
+    if checkpoint_path is not None:
+        model.load_weights(checkpoint_path)
     model.add(tf.keras.layers.Dense(vocab_size))
-    
     return model
 
 class OneStep():
@@ -151,26 +152,23 @@ class OneStep():
         # Return the characters and model state.
         return predicted_chars
 
-def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir):
-    model = build_model(vocab_size, embedding_dim, rnn_units, batch_size)
-    # load pretrained weights
-    model.load_weights(tf.train.latest_checkpoint(pretrained_checkpoint_dir))
+def get_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt = None):
+    model = build_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt)
+    # load pretrained weight
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     model.compile(optimizer='adam', loss=loss)
     return model
 
 def train_model(model, train_ds, val_ds, checkpoint_dir, epochs):
-  # Name of the checkpoint files
-  checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt_{epoch}")
-  early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
-  checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=checkpoint_prefix,
+    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath = os.path.join(checkpoint_dir, "best.hdf5"),
         save_weights_only=True,
-        save_best_only=True,
+        save_best_only=True,  # Only save the best model based on validation loss
         monitor='val_loss',
         mode='min'
-    )
-  model.fit(train_ds, epochs=epochs, validation_data=val_ds, callbacks=[checkpoint_callback, early_stopping])
+    ) 
+    model.fit(train_ds, epochs=epochs, validation_data=val_ds, callbacks=[checkpoint_callback, early_stopping])
 
 def compressConfig(data):
     layers = []
@@ -239,7 +237,6 @@ def get_model_for_export(model):
 
     weight_bytes = bytearray()
     for idx, layer in enumerate(weight_np):
-        # write_to_file(os.path.join(model_output_dir, f"model_weight_{idx:02}.txt"), str(layer))
         flatten = layer.reshape(-1).tolist()
         flatten_packed = map(lambda i: struct.pack("@f", i), flatten)
         for i in flatten_packed:
@@ -248,24 +245,7 @@ def get_model_for_export(model):
     weight_base64 = base64.b64encode(weight_bytes).decode()
     config = json.loads(model.to_json())
     compressed_config = compressConfig(config)
-    return weight_base64, compressed_config
-
-def test_model(model, chars_from_ids, ids_from_chars):
-    one_step_model = OneStep(model, chars_from_ids, ids_from_chars)
-
-    start = time.time()
-
-    next_char = tf.constant(['Q'])
-    result = [next_char]
-
-    for _ in range(1000):
-        next_char = one_step_model.generate_one_step(next_char)
-        result.append(next_char)
-
-    result = tf.strings.join(result)
-
-    end = time.time()
-    print('\nRun time:', end - start)    
+    return weight_base64, compressed_config 
 
 def get_text_from_dataset(dir):
   data_paths = glob.glob(os.path.join(dir, "*.txt"))
@@ -285,7 +265,7 @@ def main():
     config_path = args.config_path
     data_dir = args.data_dir
     output_path = args.output_path
-    pretrained_checkpoint_dir = args.pretrained_checkpoint_dir
+    ckpt = args.checkpoint_path
 
     with open(config_path, "r") as f:
         config = json.load(f)
@@ -295,7 +275,8 @@ def main():
     seq_length = config["seq_length"]
     epochs = config["epoch_num"]
 
-    tmp_checkpoint_dir = tempfile.mkdtemp()
+    tmp_checkpoint_dir = "./checkpoints"
+    # tmp_checkpoint_dir = tempfile.mkdtemp()
     datasets = glob.glob(os.path.join(data_dir, "*"))
     text = ""
     for dataset in datasets:
@@ -304,17 +285,20 @@ def main():
   
     train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
 
-    with open(os.path.join(pretrained_checkpoint_dir, 'dictionary.json'), 'r') as f:
-        vocabulary = json.load(f)
+    vocabulary = ids_from_chars.get_vocabulary()
+    # if pretrained_checkpoint_dir is not None:
+    #     with open(os.path.join(pretrained_checkpoint_dir, 'dictionary.json'), 'r') as f:
+    #         vocabulary = json.load(f)
 
     vocab_size = len(vocabulary)
-    model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir)
+    model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt)
+
 
     train_model(model, train_ds, val_ds, tmp_checkpoint_dir, epochs)
 
     model.summary()
 
-    model.load_weights(tf.train.latest_checkpoint(tmp_checkpoint_dir))
+    model.load_weights(os.path.join(tmp_checkpoint_dir, "best.hdf5"))
     weight_base64, compressed_config = get_model_for_export(model)
 
     inscription = {
