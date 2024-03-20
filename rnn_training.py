@@ -98,9 +98,10 @@ def build_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
         return_sequences=True,
         stateful=True,
     ))
+    model.add(tf.keras.layers.Dense(vocab_size))
+
     if ckpt is not None:
         model.load_weights(ckpt)
-    model.add(tf.keras.layers.Dense(vocab_size))
 
     return model
 
