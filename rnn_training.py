@@ -160,7 +160,7 @@ def train_model(model, train_ds, checkpoint_dir, epochs):
     # Name of the checkpoint files
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(checkpoint_dir, "best.weights.h5"),
+        filepath=os.path.join(checkpoint_dir, "checkpoint.weights.h5"),
         save_weights_only=True,
         monitor='loss',
         mode='min',
@@ -310,7 +310,7 @@ def main():
 
     model.summary()
 
-    model.load_weights(ckpt)
+    model.load_weights(os.path.join(checkpoint_dir, "checkpoint.weights.h5"))
     weight_base64, compressed_config = get_model_for_export(model)
 
     inscription = {
