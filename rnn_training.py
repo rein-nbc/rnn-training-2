@@ -85,6 +85,7 @@ def create_dataset_from_text(text, batch_size, seq_length):
   return train_ds, chars_from_ids, ids_from_chars, text_from_ids
 
 def build_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
+    
     model = tf.keras.models.Sequential()
     
     model.add(tf.keras.layers.Embedding(
@@ -100,7 +101,7 @@ def build_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
     if ckpt is not None:
         model.load_weights(ckpt)
     model.add(tf.keras.layers.Dense(vocab_size))
-    print(model.summary())
+
     return model
 
 class OneStep():
@@ -290,7 +291,6 @@ def main():
     batch_size = config["batch_size"]
     seq_length = config["seq_length"]
     epochs = config["epoch_num"]
-
     ckpt = args.ckpt
 
     checkpoint_dir = './checkpoints'
@@ -303,7 +303,8 @@ def main():
     train_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
     
     vocab_size = len(ids_from_chars.get_vocabulary())
-    model = get_model(vocab_size, embedding_dim, rnn_units)
+    model = get_model(vocab_size, embedding_dim, rnn_units, ckpt)
+    print(model.summary())
 
     train_model(model, train_ds, checkpoint_dir, epochs)
 
