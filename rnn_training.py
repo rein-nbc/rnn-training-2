@@ -151,7 +151,7 @@ class OneStep():
 def get_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
     model = build_model(vocab_size, embedding_dim, rnn_units, ckpt)
     # Set the learning rate
-    optimizer = tf.keras.optimizers.Adam(learning_rate = 0.001)
+    optimizer = tf.keras.optimizers.Adam(learning_rate = 0.0001)
     model.compile(loss="sparse_categorical_crossentropy", optimizer=optimizer)
     return model
 
@@ -177,7 +177,7 @@ def compressConfig(data):
         layer_config = None
         if layer["class_name"] == "InputLayer":
             layer_config = {
-                "batch_input_shape": cfg["batch_input_shape"],
+                "batch_input_shape": cfg["batch_shape"],
             }
         elif layer["class_name"] == "Rescaling":
             layer_config = {
