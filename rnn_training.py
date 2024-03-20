@@ -84,7 +84,7 @@ def create_dataset_from_text(text, batch_size, seq_length):
 
   return train_ds, chars_from_ids, ids_from_chars, text_from_ids
 
-def build_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
+def build_model(vocab_size, embedding_dim, rnn_units):
     
     model = tf.keras.models.Sequential()
     
@@ -99,9 +99,6 @@ def build_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
         stateful=True,
     )) 
     model.add(tf.keras.layers.Dense(vocab_size))
-
-    if ckpt is not None:
-        model.load_weights(ckpt)
 
     return model
 
@@ -149,8 +146,8 @@ class OneStep():
         # Return the characters and model state.
         return predicted_chars
 
-def get_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
-    model = build_model(vocab_size, embedding_dim, rnn_units, ckpt)
+def get_model(vocab_size, embedding_dim, rnn_units):
+    model = build_model(vocab_size, embedding_dim, rnn_units)
     # Set the learning rate
     optimizer = tf.keras.optimizers.Adam(learning_rate = 0.0001)
     model.compile(loss="sparse_categorical_crossentropy", optimizer=optimizer)
@@ -304,8 +301,10 @@ def main():
     train_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
     
     vocab_size = len(ids_from_chars.get_vocabulary())
-    model = get_model(vocab_size, embedding_dim, rnn_units, ckpt)
+    model = get_model(vocab_size, embedding_dim, rnn_units)
 
+    if ckpt is not None:
+        model.load_weights(ckpt)
     train_model(model, train_ds, checkpoint_dir, epochs)
 
     model.summary()
