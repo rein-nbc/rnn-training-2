@@ -92,7 +92,6 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path = N
 
     if model_path is not None:
         model = tf.keras.models.load_model(model_path)
-        model.add(tf.keras.layers.Dense(vocab_size, name = "dense_1"))
         return model
 
     model = tf.keras.models.Sequential()
@@ -104,17 +103,12 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path = N
     ))
     
     model.add(tf.keras.layers.LSTM(
-        units=rnn_units,
+        units= 32,
         return_sequences=True,
         stateful=True,
     ))
     model.add(tf.keras.layers.LSTM(
-        units=rnn_units,
-        return_sequences=True,
-        stateful=True,
-    ))
-    model.add(tf.keras.layers.LSTM(
-        units=rnn_units,
+        units= 128,
         return_sequences=True,
         stateful=True,
     ))
