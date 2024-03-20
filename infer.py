@@ -18,6 +18,7 @@ def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch inference")
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
     parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
+    parser.add_argument("--checkpoint-path", type =str, required = True, help="Path to the checkpoint file")
     return parser.parse_args()
 
 def get_file_content(file_path):
@@ -168,26 +169,6 @@ def create_dataset_from_text(text, batch_size, seq_length):
   return dataset, chars_from_ids, ids_from_chars, text_from_ids
 
 
-def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
-  model = tf.keras.models.Sequential()
-
-  model.add(tf.keras.layers.Embedding(
-    input_dim=156,
-    output_dim=embedding_dim,
-    batch_input_shape=[batch_size, None]
-  ))
-
-  model.add(tf.keras.layers.LSTM(
-    units=rnn_units,
-    return_sequences=True,
-    stateful=True,
-  ))
-  model.add(tf.keras.layers.Dense(156))
-
-  model.add(tf.keras.layers.Dense(vocab_size))
-
-  return model
-
 
 class OneStep(tf.keras.Model):
   def __init__(self, model, chars_from_ids, ids_from_chars, temperature=1.0):
@@ -279,48 +260,35 @@ def test_model(model, chars_from_ids, ids_from_chars, prompt, temperature=1.0):
 
 
 def main():
-  args = parse_args()
-  # The embedding dimension
-  config_path = args.config_path
-  data_dir = args.data_dir
+    args = parse_args()
+    # The embedding dimension
+    config_path = args.config_path
+    data_dir = args.data_dir
 
-  with open(config_path, "r") as f:
-      config = json.load(f)
+    with open(config_path, "r") as f:
+        config = json.load(f)
 
-  embedding_dim = config["embedding_dim"]
-  rnn_units = config["rnn_units"]
-  batch_size = config["batch_size"]
-  seq_length = config["seq_length"]
-  checkpoint_dir = './checkpoints'
+    embedding_dim = config["embedding_dim"]
+    rnn_units = config["rnn_units"]
+    batch_size = config["batch_size"]
+    seq_length = config["seq_length"]
 
-  temperature = 0.7
-  prompt = 'Human 1:'
+    temperature = 0.7
+    prompt = 'First Citizen:'
 
-  datasets = glob.glob(os.path.join(data_dir, "*"))
-  text = ""
-  for dataset in datasets:
-    text += get_text_from_dataset(dataset)
-    text += "\n"
+    datasets = glob.glob(os.path.join(data_dir, "*"))
+    text = ""
+    for dataset in datasets:
+        text += get_text_from_dataset(dataset)
+        text += "\n"
 
-  dataset, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
+    dataset, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
 
-  # Length of the vocabulary in StringLookup Layer
-  vocab_size = len(ids_from_chars.get_vocabulary())
+    # Length of the vocabulary in StringLookup Layer
+    
+    model = tf.keras.models.load_model(args.checkpoint_path)
+    print(model.summary())
+    test_model(model, chars_from_ids, ids_from_chars, prompt, temperature)
 
-  model = build_model(vocab_size, embedding_dim, rnn_units, batch_size=1)
-  model.load_weights(os.path.join(checkpoint_dir, "best.hdf5"))
-  test_model(model, chars_from_ids, ids_from_chars, prompt, temperature)
-  
-  weight_base64, compressed_config = get_model_for_export(model)
-
-  inscription = {
-      "model_name": "RNN",
-      "layers_config": compressed_config,
-      "vocabulary": ids_from_chars.get_vocabulary(),
-      "weight_b64": weight_base64
-  } 
-  inscription_json = json.dumps(inscription)
-  write_to_file('model.json', inscription_json)
-
-
-main()  
+if __name__ == "__main__":
+    main()

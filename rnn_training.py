@@ -103,12 +103,7 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path = N
     ))
     
     model.add(tf.keras.layers.LSTM(
-        units= 128,
-        return_sequences=True,
-        stateful=True,
-    ))
-    model.add(tf.keras.layers.LSTM(
-        units= 128,
+        units = rnn_units,
         return_sequences=True,
         stateful=True,
     ))
@@ -164,7 +159,8 @@ def get_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path = Non
     model = build_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path)
     # load pretrained weight
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
-    model.compile(optimizer='adam', loss=loss)
+    optimizer = tf.optimizers.Adam(learning_rate=0.0002)
+    model.compile(optimizer = optimizer, loss = loss)
     return model
 
 def compressConfig(data):
@@ -287,11 +283,18 @@ def main():
     vocab_size = len(vocabulary)
     model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt)
 
-    model.fit(train_ds, epochs=epochs)
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=os.path.join(output_dir, "model.h5"),
+        save_best_only=True,
+        monitor='loss',
+        mode='min',
+        verbose=1
+    )
+    model.fit(train_ds, epochs=epochs, callbacks = [checkpoint_callback])
 
     model.summary()
 
-    model.save(os.path.join(output_dir, "model.h5"))
+    # model.save(os.path.join(output_dir, "model.h5"))
     
     weight_base64, compressed_config = get_model_for_export(model)
 
