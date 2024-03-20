@@ -19,7 +19,7 @@ import argparse
 import tempfile 
 import tensorflow as tf
 
-VAL_PERCENT = 20
+VAL_PERCENT = 10
 
 
 def parse_args():
@@ -250,6 +250,7 @@ def get_model_for_export(model):
 
     weight_base64 = base64.b64encode(weight_bytes).decode()
     config = json.loads(model.to_json())
+    print(config)
     compressed_config = compressConfig(config)
     return weight_base64, compressed_config
 
@@ -316,10 +317,6 @@ def main():
     model.summary()
 
     model.load_weights(os.path.join(checkpoint_dir, "best.weights.h5"))
-    # save ids_from_chars
-    with open(os.path.join(checkpoint_dir, "ids_from_chars.json"), "w") as f:
-        json.dump(ids_from_chars.get_vocabulary(), f)
-
     weight_base64, compressed_config = get_model_for_export(model)
 
     inscription = {
