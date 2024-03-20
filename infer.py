@@ -294,7 +294,7 @@ def main():
   checkpoint_dir = './checkpoints'
 
   temperature = 0.7
-  prompt = 'Nice day'
+  prompt = 'Human 1:'
 
   datasets = glob.glob(os.path.join(data_dir, "*"))
   text = ""
