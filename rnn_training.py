@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
     parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
     parser.add_argument("--output-path", type=str, default = "output.json", help="Path to the output file")
-    parser.add_argument("--pretrained-checkpoint-dir", type=str, default = None, help="Path to the pretrained checkpoint directory")
+    parser.add_argument("--ckpt", type=str, default = None, help="Path to the checkpoint file")
     return parser.parse_args()
 
 def get_file_content(file_path):
@@ -146,14 +146,13 @@ class OneStep():
         # Return the characters and model state.
         return predicted_chars
 
-def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir):
+def get_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt = None):
     model = build_model(vocab_size, embedding_dim, rnn_units, batch_size)
     # load pretrained weights
-    if pretrained_checkpoint_dir is not None:
-        checkpoint_path = os.path.join(pretrained_checkpoint_dir, "best.weights.h5")
-        model.load_weights(checkpoint_path)
+    if ckpt is not None:
+        model.load_weights(ckpt)
     # Set the learning rate
-    optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.01)
+    optimizer = tf.keras.optimizers.Adam(learning_rate = 0.001)
     model.compile(loss="categorical_crossentropy", optimizer=optimizer)
     return model
 
@@ -295,7 +294,7 @@ def main():
     seq_length = config["seq_length"]
     epochs = config["epoch_num"]
 
-    pretrained_checkpoint_dir = args.pretrained_checkpoint_dir
+    ckpt = args.ckpt
 
     checkpoint_dir = './checkpoints'
     datasets = glob.glob(os.path.join(data_dir, "*"))
@@ -307,7 +306,7 @@ def main():
     train_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
     
     vocab_size = len(ids_from_chars.get_vocabulary())
-    model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir)
+    model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt)
 
     train_model(model, train_ds, checkpoint_dir, epochs)
 
