@@ -157,13 +157,14 @@ def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_check
     return model
 
 def train_model(model, train_ds, checkpoint_dir, epochs):
+    print(model.to_json())
     # Name of the checkpoint files
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=os.path.join(checkpoint_dir, "best.weights.h5"),
         save_weights_only=True,
-        monitor = 'train_loss',
-        mode = 'min',
+        monitor='loss',
+        mode='min',
         save_best_only=True
     )
     # Enable GPU training
