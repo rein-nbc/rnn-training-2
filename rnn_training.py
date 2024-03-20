@@ -83,16 +83,22 @@ def create_dataset_from_text(text, batch_size, seq_length, val_percent=VAL_PERCE
     return dataset
   
   # train_ds, val_ds = tf.keras.utils.split_dataset(dataset, left_size=1-val_percent/100, shuffle=True, seed=shuffle_seed)
-  train_ds = get_dataset(train_ids)
+  train_ds = get_dataset(all_ids)
   val_ds = get_dataset(val_ids)
 
   return train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids
 
-def build_model(vocab_size, embedding_dim, rnn_units, batch_size, checkpoint_path = None):
+def build_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path = None):
+
+    if model_path is not None:
+        model = tf.keras.models.load_model(model_path)
+        model.add(tf.keras.layers.Dense(vocab_size))
+        return model
+
     model = tf.keras.models.Sequential()
 
     model.add(tf.keras.layers.Embedding(
-        input_dim=156,
+        input_dim=vocab_size,
         output_dim=embedding_dim,
         batch_input_shape=[batch_size, None]
     ))
@@ -102,9 +108,17 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size, checkpoint_pat
         return_sequences=True,
         stateful=True,
     ))
-    model.add(tf.keras.layers.Dense(156))
-    if checkpoint_path is not None:
-        model.load_weights(checkpoint_path)
+    model.add(tf.keras.layers.LSTM(
+        units=rnn_units,
+        return_sequences=True,
+        stateful=True,
+    ))
+    model.add(tf.keras.layers.LSTM(
+        units=rnn_units,
+        return_sequences=True,
+        stateful=True,
+    ))
+
     model.add(tf.keras.layers.Dense(vocab_size))
     return model
 
@@ -152,23 +166,12 @@ class OneStep():
         # Return the characters and model state.
         return predicted_chars
 
-def get_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt = None):
-    model = build_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt)
+def get_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path = None):
+    model = build_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path)
     # load pretrained weight
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     model.compile(optimizer='adam', loss=loss)
     return model
-
-def train_model(model, train_ds, val_ds, checkpoint_dir, epochs):
-    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
-    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath = os.path.join(checkpoint_dir, "best.hdf5"),
-        save_weights_only=True,
-        save_best_only=True,  # Only save the best model based on validation loss
-        monitor='val_loss',
-        mode='min'
-    ) 
-    model.fit(train_ds, epochs=epochs, validation_data=val_ds, callbacks=[checkpoint_callback, early_stopping])
 
 def compressConfig(data):
     layers = []
@@ -275,8 +278,7 @@ def main():
     seq_length = config["seq_length"]
     epochs = config["epoch_num"]
 
-    tmp_checkpoint_dir = "./checkpoints"
-    # tmp_checkpoint_dir = tempfile.mkdtemp()
+
     datasets = glob.glob(os.path.join(data_dir, "*"))
     text = ""
     for dataset in datasets:
@@ -286,19 +288,17 @@ def main():
     train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
 
     vocabulary = ids_from_chars.get_vocabulary()
-    # if pretrained_checkpoint_dir is not None:
-    #     with open(os.path.join(pretrained_checkpoint_dir, 'dictionary.json'), 'r') as f:
-    #         vocabulary = json.load(f)
+
 
     vocab_size = len(vocabulary)
     model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt)
 
-
-    train_model(model, train_ds, val_ds, tmp_checkpoint_dir, epochs)
+    model.fit(train_ds, epochs=epochs)
 
     model.summary()
 
-    model.load_weights(os.path.join(tmp_checkpoint_dir, "best.hdf5"))
+    model.save("model.h5")
+    
     weight_base64, compressed_config = get_model_for_export(model)
 
     inscription = {
