@@ -19,8 +19,6 @@ import argparse
 import tempfile 
 import tensorflow as tf
 
-VAL_PERCENT = 10
-
 
 def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
@@ -40,7 +38,7 @@ def write_to_file(file_path, content):
     with open(file_path, "w") as f:
         f.write(content)
 
-def create_dataset_from_text(text, batch_size, seq_length, val_percent=VAL_PERCENT):
+def create_dataset_from_text(text, batch_size, seq_length):
   # The unique characters in the file
   vocab = sorted(set(text))
 
@@ -54,8 +52,6 @@ def create_dataset_from_text(text, batch_size, seq_length, val_percent=VAL_PERCE
 
   all_ids = ids_from_chars(tf.strings.unicode_split(text, 'UTF-8'))
 
-  val_start = int(len(all_ids) * (1 - val_percent/100))
-  train_ids, val_ids = all_ids[:val_start], all_ids[val_start:]
 
   def get_dataset(all_ids):
     ids_dataset = tf.data.Dataset.from_tensor_slices(all_ids)
@@ -84,10 +80,9 @@ def create_dataset_from_text(text, batch_size, seq_length, val_percent=VAL_PERCE
     return dataset
   
   # train_ds, val_ds = tf.keras.utils.split_dataset(dataset, left_size=1-val_percent/100, shuffle=True, seed=shuffle_seed)
-  train_ds = get_dataset(train_ids)
-  val_ds = get_dataset(val_ids)
+  train_ds = get_dataset(all_ids)
 
-  return train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids
+  return train_ds, chars_from_ids, ids_from_chars, text_from_ids
 
 def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
     model = tf.keras.models.Sequential()
@@ -161,19 +156,19 @@ def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_check
     model.compile(optimizer='adam', loss=loss)
     return model
 
-def train_model(model, train_ds, val_ds, checkpoint_dir, epochs):
+def train_model(model, train_ds, checkpoint_dir, epochs):
     # Name of the checkpoint files
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath = os.path.join(checkpoint_dir, "best.weights.h5"),
+        filepath=os.path.join(checkpoint_dir, "best.weights.h5"),
         save_weights_only=True,
-        save_best_only=True,  # Only save the best model based on validation loss
-        monitor='val_loss',
-        mode='min'
+        monitor = 'train_loss',
+        mode = 'min',
+        save_best_only=True
     )
     # Enable GPU training
     with tf.device('/device:GPU:0'):
-        model.fit(train_ds, epochs=epochs, validation_data=val_ds, callbacks=[checkpoint_callback, early_stopping])
+        model.fit(train_ds, epochs=epochs, callbacks=[checkpoint_callback, early_stopping])
 
 def compressConfig(data):
     layers = []
@@ -307,12 +302,12 @@ def main():
       text += get_text_from_dataset(dataset)
       text += "\n"
   
-    train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
+    train_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
     
     vocab_size = len(ids_from_chars.get_vocabulary())
     model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_checkpoint_dir)
 
-    train_model(model, train_ds, val_ds, checkpoint_dir, epochs)
+    train_model(model, train_ds, checkpoint_dir, epochs)
 
     model.summary()
 
