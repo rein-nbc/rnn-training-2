@@ -100,6 +100,7 @@ def build_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
     if ckpt is not None:
         model.load_weights(ckpt)
     model.add(tf.keras.layers.Dense(vocab_size))
+    print(model.summary())
     return model
 
 class OneStep():
