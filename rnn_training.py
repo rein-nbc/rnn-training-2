@@ -146,8 +146,8 @@ class OneStep():
         # Return the characters and model state.
         return predicted_chars
 
-def get_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt = None):
-    model = build_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt)
+def get_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
+    model = build_model(vocab_size, embedding_dim, rnn_units, ckpt)
     # Set the learning rate
     optimizer = tf.keras.optimizers.Adam(learning_rate = 0.001)
     model.compile(loss="categorical_crossentropy", optimizer=optimizer)
@@ -302,7 +302,7 @@ def main():
     train_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
     
     vocab_size = len(ids_from_chars.get_vocabulary())
-    model = get_model(vocab_size, embedding_dim, rnn_units, batch_size)
+    model = get_model(vocab_size, embedding_dim, rnn_units)
 
     train_model(model, train_ds, checkpoint_dir, epochs)
 
