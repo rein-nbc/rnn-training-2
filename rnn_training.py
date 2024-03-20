@@ -152,7 +152,7 @@ def get_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
     model = build_model(vocab_size, embedding_dim, rnn_units, ckpt)
     # Set the learning rate
     optimizer = tf.keras.optimizers.Adam(learning_rate = 0.001)
-    model.compile(loss="categorical_crossentropy", optimizer=optimizer)
+    model.compile(loss="sparse_categorical_crossentropy", optimizer=optimizer)
     return model
 
 def train_model(model, train_ds, checkpoint_dir, epochs):
