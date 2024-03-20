@@ -193,12 +193,10 @@ class OneStep(tf.keras.Model):
     # Convert strings to token IDs.
     input_chars = tf.strings.unicode_split(inputs, 'UTF-8')
     input_ids = self.ids_from_chars(input_chars).to_tensor()
-    # to from (1, None, 128) to (1024, None, 128)
-    input_ids = tf.repeat(input_ids, 1024, axis=0)
-
+    
     # Run the model.
     # predicted_logits.shape is [batch, char, next_char_logits]
-    predicted_logits = self.model(inputs=input_ids)[0]
+    predicted_logits = self.model(inputs=input_ids)
 
     # Only use the last prediction.
     predicted_logits = predicted_logits[:, -1, :]
@@ -234,12 +232,12 @@ def test_model(model, chars_from_ids, ids_from_chars, prompt, temperature=1.0):
   one_step_model = OneStep(model, chars_from_ids, ids_from_chars, temperature)
 
   start = time.time()
-  next_char = tf.constant([prompt])
+  next_char = tf.constant([prompt for _ in range(1024)])
   result = [next_char]
 
   for n in range(100):
     next_char = one_step_model.generate_one_step(next_char)
-    result.append(next_char)
+    result.append(next_char[-1])
 
   result = tf.strings.join(result)
 
