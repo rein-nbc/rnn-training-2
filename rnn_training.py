@@ -304,7 +304,6 @@ def main():
     
     vocab_size = len(ids_from_chars.get_vocabulary())
     model = get_model(vocab_size, embedding_dim, rnn_units, ckpt)
-    print(model.summary())
 
     train_model(model, train_ds, checkpoint_dir, epochs)
 
