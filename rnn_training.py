@@ -103,7 +103,7 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path = N
     ))
     
     model.add(tf.keras.layers.LSTM(
-        units= 32,
+        units= 128,
         return_sequences=True,
         stateful=True,
     ))
