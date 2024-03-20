@@ -13,6 +13,9 @@ import time
 import json
 import argparse
 import glob
+from thefuzz import fuzz
+from thefuzz import process
+
 
 def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch inference")
@@ -229,21 +232,38 @@ def train_model(model, dataset, checkpoint_dir, epochs):
 
 
 def test_model(model, chars_from_ids, ids_from_chars, prompt, temperature=1.0):
-  one_step_model = OneStep(model, chars_from_ids, ids_from_chars, temperature)
+    with open('/Users/vuonggiahuy/rnn-training-2/data/shakepeare1/shakespeare.json', 'r') as f:
+       collection = json.load(f)
+    one_step_model = OneStep(model, chars_from_ids, ids_from_chars, temperature)
 
-  start = time.time()
-  next_char = tf.constant([prompt for _ in range(1024)])
-  result = [next_char]
+    start = time.time()
+    next_char = tf.constant([prompt for _ in range(1024)])
+    result = [next_char]
+    word = ""
 
-  for n in range(100):
-    next_char = one_step_model.generate_one_step(next_char)
-    result.append(next_char[-1])
+    for n in range(1000):
+        next_char = one_step_model.generate_one_step(next_char)
+        result.append(next_char)
 
-  result = tf.strings.join(result)
+    result = tf.strings.join(result)
 
-  end = time.time()
-  print(result[0].numpy().decode('utf-8'), '\n\n' + '_'*80)
-  print('\nRun time:', end - start)
+    end = time.time()
+    context = result[-1].numpy().decode('utf-8')
+    # result = ""
+    # word = ""
+    # i = 0
+    # while i < len(context) - 1:
+    #     if context[i + 1] == " " or context[i + 1] == "\n":
+    #         new_word = process.extract(word, collection, scorer=fuzz.ratio)[0][0]
+    #         result += new_word
+    #         result += context[i + 1]
+    #         word = ""
+    #         i = i + 2
+    #     else:
+    #         word += context[i]
+    #         i = i + 1
+    print(context)
+    print('\nRun time:', end - start)
 
 
 def main():
@@ -261,7 +281,7 @@ def main():
     seq_length = config["seq_length"]
 
     temperature = 0.7
-    prompt = 'First Citizen:'
+    prompt = 'ROMEO:\nIs the day so young?'
 
     datasets = glob.glob(os.path.join(data_dir, "*"))
     text = ""
