@@ -25,7 +25,7 @@ def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
     parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
-    parser.add_argument("--output-path", type=str, default = "output.json", help="Path to the output file")
+    parser.add_argument("--output-dir", type=str, default = "./output", help="Path to the output directory")
     parser.add_argument("--checkpoint-path", type =str, default=None, help="Path to the checkpoint file")
     return parser.parse_args()
 
@@ -267,7 +267,7 @@ def main():
     # The embedding dimension
     config_path = args.config_path
     data_dir = args.data_dir
-    output_path = args.output_path
+    output_dir = args.output_dir
     ckpt = args.checkpoint_path
 
     with open(config_path, "r") as f:
@@ -297,7 +297,7 @@ def main():
 
     model.summary()
 
-    model.save("model.h5")
+    model.save(os.path.join(output_dir, "model.h5"))
     
     weight_base64, compressed_config = get_model_for_export(model)
 
@@ -308,7 +308,7 @@ def main():
         "weight_b64": weight_base64
     }
     inscription_json = json.dumps(inscription)
-    write_to_file(output_path, inscription_json)
+    write_to_file(os.path.join(output_dir, "model.json"), inscription_json)
     
 
 if __name__ == "__main__":
