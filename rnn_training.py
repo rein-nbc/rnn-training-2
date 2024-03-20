@@ -90,7 +90,7 @@ def build_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
     
     model.add(tf.keras.layers.Embedding(
         input_dim=vocab_size,
-        output_dim=embedding_dim    
+        output_dim=embedding_dim
     ))
     
     model.add(tf.keras.layers.LSTM(
@@ -177,7 +177,7 @@ def compressConfig(data):
         layer_config = None
         if layer["class_name"] == "InputLayer":
             layer_config = {
-                "batch_input_shape": [cfg["batch_shape"][0], None]
+                "batch_input_shape": cfg["batch_input_shape"],
             }
         elif layer["class_name"] == "Rescaling":
             layer_config = {
