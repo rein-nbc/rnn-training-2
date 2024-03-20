@@ -157,7 +157,6 @@ def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_check
     return model
 
 def train_model(model, train_ds, checkpoint_dir, epochs):
-    print(model.to_json())
     # Name of the checkpoint files
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
@@ -169,7 +168,7 @@ def train_model(model, train_ds, checkpoint_dir, epochs):
     )
     # Enable GPU training
     with tf.device('/device:GPU:0'):
-        model.fit(train_ds, epochs=epochs, callbacks=[checkpoint_callback, early_stopping])
+        model.fit(train_ds, epochs=epochs, callbacks=[checkpoint_callback], learning_rate=0.001)
 
 def compressConfig(data):
     layers = []
