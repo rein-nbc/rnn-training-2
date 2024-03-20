@@ -159,7 +159,7 @@ def get_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path = Non
     model = build_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path)
     # load pretrained weight
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
-    optimizer = tf.optimizers.Adam(learning_rate=0.000001)
+    optimizer = tf.optimizers.Adam(learning_rate=0.001)
     model.compile(optimizer = optimizer, loss = loss)
     return model
 
