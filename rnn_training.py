@@ -246,7 +246,6 @@ def get_model_for_export(model):
 
     weight_base64 = base64.b64encode(weight_bytes).decode()
     config = json.loads(model.to_json())
-    print(config)
     compressed_config = compressConfig(config)
     return weight_base64, compressed_config
 
