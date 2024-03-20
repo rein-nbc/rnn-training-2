@@ -152,10 +152,9 @@ def get_model(vocab_size, embedding_dim, rnn_units, batch_size, pretrained_check
     if pretrained_checkpoint_dir is not None:
         checkpoint_path = os.path.join(pretrained_checkpoint_dir, "best.weights.h5")
         model.load_weights(checkpoint_path)
-    loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     # Set the learning rate
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
-    model.compile(optimizer, loss=loss)
+    optimizer = tf.keras.optimizers.RMSprop(learning_rate=0.01)
+    model.compile(loss="categorical_crossentropy", optimizer=optimizer)
     return model
 
 def train_model(model, train_ds, checkpoint_dir, epochs):
@@ -180,7 +179,7 @@ def compressConfig(data):
         layer_config = None
         if layer["class_name"] == "InputLayer":
             layer_config = {
-                "batch_input_shape": cfg["batch_input_shape"]
+                "batch_input_shape": [cfg["batch_shape"][0], None]
             }
         elif layer["class_name"] == "Rescaling":
             layer_config = {
