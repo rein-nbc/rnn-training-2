@@ -193,10 +193,12 @@ class OneStep(tf.keras.Model):
     # Convert strings to token IDs.
     input_chars = tf.strings.unicode_split(inputs, 'UTF-8')
     input_ids = self.ids_from_chars(input_chars).to_tensor()
+    # to from (1, None, 128) to (1024, None, 128)
+    input_ids = tf.repeat(input_ids, 1024, axis=0)
 
     # Run the model.
     # predicted_logits.shape is [batch, char, next_char_logits]
-    predicted_logits = self.model(inputs=input_ids)
+    predicted_logits = self.model(inputs=input_ids)[0]
 
     # Only use the last prediction.
     predicted_logits = predicted_logits[:, -1, :]
@@ -214,19 +216,6 @@ class OneStep(tf.keras.Model):
     # Return the characters and model state.
     return predicted_chars
 
-
-def get_model(vocab_size, embedding_dim, rnn_units, batch_size):
-  model = build_model(vocab_size, embedding_dim, rnn_units, batch_size)
-  # model = MyModel(
-  #     vocab_size=vocab_size,
-  #     embedding_dim=embedding_dim,
-  #     rnn_units=rnn_units)
-
-  loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
-
-  model.compile(optimizer='adam', loss=loss)
-
-  return model
 
 
 def train_model(model, dataset, checkpoint_dir, epochs):

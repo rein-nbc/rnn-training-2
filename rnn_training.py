@@ -287,8 +287,7 @@ def main():
         filepath=os.path.join(output_dir, "model.h5"),
         save_best_only=True,
         monitor='loss',
-        mode='min',
-        verbose=1
+        mode='min'    
     )
     model.fit(train_ds, epochs=epochs, callbacks = [checkpoint_callback])
 
