@@ -305,7 +305,7 @@ def main():
     train_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
     
     vocab_size = len(ids_from_chars.get_vocabulary())
-    model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt)
+    model = get_model(vocab_size, embedding_dim, rnn_units, batch_size)
 
     train_model(model, train_ds, checkpoint_dir, epochs)
 
