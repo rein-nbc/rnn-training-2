@@ -310,7 +310,7 @@ def main():
 
     model.summary()
 
-    model.load_weights(os.path.join(checkpoint_dir, "best.weights.h5"))
+    model.load_weights(ckpt)
     weight_base64, compressed_config = get_model_for_export(model)
 
     inscription = {
