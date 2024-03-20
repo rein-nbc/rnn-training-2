@@ -84,7 +84,7 @@ def create_dataset_from_text(text, batch_size, seq_length):
 
   return train_ds, chars_from_ids, ids_from_chars, text_from_ids
 
-def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
+def build_model(vocab_size, embedding_dim, rnn_units, ckpt = None):
     model = tf.keras.models.Sequential()
     
     model.add(tf.keras.layers.Embedding(
@@ -97,9 +97,9 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
         return_sequences=True,
         stateful=True,
     ))
-    
+    if ckpt is not None:
+        model.load_weights(ckpt)
     model.add(tf.keras.layers.Dense(vocab_size))
-    
     return model
 
 class OneStep():
@@ -147,10 +147,7 @@ class OneStep():
         return predicted_chars
 
 def get_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt = None):
-    model = build_model(vocab_size, embedding_dim, rnn_units, batch_size)
-    # load pretrained weights
-    if ckpt is not None:
-        model.load_weights(ckpt)
+    model = build_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt)
     # Set the learning rate
     optimizer = tf.keras.optimizers.Adam(learning_rate = 0.001)
     model.compile(loss="categorical_crossentropy", optimizer=optimizer)
