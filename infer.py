@@ -281,8 +281,8 @@ def main():
     seq_length = config["seq_length"]
 
     temperature = 0.7
-    # prompt = 'ROMEO:\nIs the day so young?'
-    prompt = 'Human 1:'
+    prompt = 'ROMEO:\nIs the day so young?'
+    # prompt = ''
 
     datasets = glob.glob(os.path.join(data_dir, "*"))
     text = ""
