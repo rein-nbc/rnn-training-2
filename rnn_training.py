@@ -108,6 +108,12 @@ def build_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path = N
         stateful=True,
     ))
 
+    model.add(tf.keras.layers.LSTM(
+        units = rnn_units,
+        return_sequences=True,
+        stateful=True,
+    ))
+
     model.add(tf.keras.layers.Dense(vocab_size))
     return model
 
