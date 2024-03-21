@@ -232,8 +232,8 @@ def train_model(model, dataset, checkpoint_dir, epochs):
 
 
 def test_model(model, chars_from_ids, ids_from_chars, prompt, temperature=1.0):
-    with open('/Users/vuonggiahuy/rnn-training-2/data/shakepeare1/shakespeare.json', 'r') as f:
-       collection = json.load(f)
+    # with open('/Users/vuonggiahuy/rnn-training-2/data/shakepeare1/shakespeare.json', 'r') as f:
+    #    collection = json.load(f)
     one_step_model = OneStep(model, chars_from_ids, ids_from_chars, temperature)
 
     start = time.time()
@@ -281,7 +281,8 @@ def main():
     seq_length = config["seq_length"]
 
     temperature = 0.7
-    prompt = 'ROMEO:\nIs the day so young?'
+    # prompt = 'ROMEO:\nIs the day so young?'
+    prompt = 'Human 1:'
 
     datasets = glob.glob(os.path.join(data_dir, "*"))
     text = ""
