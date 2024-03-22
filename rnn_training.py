@@ -142,26 +142,13 @@ def create_model(config, model_path = None):
     vocab_size = config["vocab_size"]
     sequence_length = config["seq_length"]
 
-    model = tf.keras.models.Sequential()
-
-    model.add(tf.keras.layers.Embedding(
-        input_dim=vocab_size,
-        output_dim=embedding_dim,
-        input_length = sequence_length,
-
-    ))
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.InputLayer(input_shape=(sequence_length, 1)),
+        tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=sequence_length),
+        tf.keras.layers.LSTM(units=rnn_units, return_sequences=True, stateful=True),
+        tf.keras.layers.LSTM(units=rnn_units, return_sequences=True, stateful=True)
+    ])
     
-    model.add(tf.keras.layers.LSTM(
-        units = rnn_units,
-        return_sequences=True,
-        stateful=True,
-    ))
-
-    model.add(tf.keras.layers.LSTM(
-        units = rnn_units,
-        return_sequences=True,
-        stateful=True,
-    ))
 
     model.add(tf.keras.layers.Dense(vocab_size))
     return model
