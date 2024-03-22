@@ -8,12 +8,21 @@ Original file is located at
 """
 
 import tensorflow as tf
-
-import numpy as np
 import os
 import time
 import json
+import argparse
+import glob
+from thefuzz import fuzz
+from thefuzz import process
 
+
+def parse_args():
+    parser = argparse.ArgumentParser("Entry script to launch inference")
+    parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
+    parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
+    parser.add_argument("--checkpoint-path", type =str, required = True, help="Path to the checkpoint file")
+    return parser.parse_args()
 
 def get_file_content(file_path):
   with open(file_path, "r") as f:
@@ -27,13 +36,98 @@ def write_to_file(file_path, content):
   f.close()
 
 
-def get_text_from_file():
-  path_to_file = tf.keras.utils.get_file('shakespeare.txt', 'https://storage.googleapis.com/download.tensorflow.org/data/shakespeare.txt')
-
-  # Read, then decode for py2 compat.
-  text = open(path_to_file, 'rb').read().decode(encoding='utf-8')
-
+def get_text_from_dataset(dir):
+  data_paths = glob.glob(os.path.join(dir, "*.txt"))
+  def get_text_from_file(file_path):
+      # Read, then decode for py2 compat.
+      text = open(file_path, 'rb').read().decode(encoding='utf-8')
+      return text
+  text = ""
+  for data_path in data_paths:
+      text += get_text_from_file(data_path)
+      text += "\n"
   return text
+
+import struct
+import base64
+
+def compressConfig(data):
+    layers = []
+    for layer in data["config"]["layers"]:
+        cfg = layer["config"]
+        layer_config = None
+        if layer["class_name"] == "InputLayer":
+            layer_config = {
+                "batch_input_shape": cfg["batch_input_shape"]
+            }
+        elif layer["class_name"] == "Rescaling":
+            layer_config = {
+                "scale": cfg["scale"],
+                "offset": cfg["offset"]
+            }
+        elif layer["class_name"] == "Dense":
+            layer_config = {
+                "units": cfg["units"],
+                "activation": cfg["activation"]
+            }
+        elif layer["class_name"] == "Conv2D":
+            layer_config = {
+                "filters": cfg["filters"],
+                "kernel_size": cfg["kernel_size"],
+                "strides": cfg["strides"],
+                "activation": cfg["activation"],
+                "padding": cfg["padding"]
+            }
+        elif layer["class_name"] == "MaxPooling2D":
+            layer_config = {
+                "pool_size": cfg["pool_size"],
+                "strides": cfg["strides"],
+                "padding": cfg["padding"]
+            }
+        elif layer["class_name"] == "Embedding":
+            layer_config = {
+                "input_dim": cfg["input_dim"],
+                "output_dim": cfg["output_dim"]
+            }
+        elif layer["class_name"] == "SimpleRNN":
+            layer_config = {
+                "units": cfg["units"],
+                "activation": cfg["activation"]
+            }
+        elif layer["class_name"] == "LSTM":
+            layer_config = {
+                "units": cfg["units"],
+                "activation": cfg["activation"],
+                "recurrent_activation": cfg["recurrent_activation"]
+            }
+        res_layer = {
+            "class_name": layer["class_name"],
+        }
+        if layer_config is not None:
+            res_layer["config"] = layer_config
+        layers.append(res_layer)
+
+    return {
+        "config": {
+            "layers": layers
+        }
+    }
+
+def get_model_for_export(model):
+    weight_np = model.get_weights()
+
+    weight_bytes = bytearray()
+    for idx, layer in enumerate(weight_np):
+        # write_to_file(os.path.join(model_output_dir, f"model_weight_{idx:02}.txt"), str(layer))
+        flatten = layer.reshape(-1).tolist()
+        flatten_packed = map(lambda i: struct.pack("@f", i), flatten)
+        for i in flatten_packed:
+            weight_bytes.extend(i)
+
+    weight_base64 = base64.b64encode(weight_bytes).decode()
+    config = json.loads(model.to_json())
+    compressed_config = compressConfig(config)
+    return weight_base64, compressed_config
 
 
 def create_dataset_from_text(text, batch_size, seq_length):
@@ -78,48 +172,6 @@ def create_dataset_from_text(text, batch_size, seq_length):
   return dataset, chars_from_ids, ids_from_chars, text_from_ids
 
 
-def build_model(vocab_size, embedding_dim, rnn_units, batch_size):
-  model = tf.keras.models.Sequential()
-
-  model.add(tf.keras.layers.Embedding(
-    input_dim=vocab_size,
-    output_dim=embedding_dim,
-    batch_input_shape=[batch_size, None]
-  ))
-
-  model.add(tf.keras.layers.LSTM(
-    units=rnn_units,
-    return_sequences=True,
-    stateful=True,
-  ))
-
-  model.add(tf.keras.layers.Dense(vocab_size))
-
-  return model
-
-
-# class MyModel(tf.keras.Model):
-#   def __init__(self, vocab_size, embedding_dim, rnn_units):
-#     super().__init__(self)
-#     self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-#     self.gru = tf.keras.layers.GRU(rnn_units,
-#                                   return_sequences=True,
-#                                   return_state=True)
-#     self.dense = tf.keras.layers.Dense(vocab_size)
-
-#   def call(self, inputs, states=None, return_state=False, training=False):
-#     x = inputs
-#     x = self.embedding(x, training=training)
-#     if states is None:
-#       states = self.gru.get_initial_state(x)
-#     x, states = self.gru(x, initial_state=states, training=training)
-#     x = self.dense(x, training=training)
-
-#     if return_state:
-#       return x, states
-#     else:
-#       return x
-
 
 class OneStep(tf.keras.Model):
   def __init__(self, model, chars_from_ids, ids_from_chars, temperature=1.0):
@@ -144,7 +196,7 @@ class OneStep(tf.keras.Model):
     # Convert strings to token IDs.
     input_chars = tf.strings.unicode_split(inputs, 'UTF-8')
     input_ids = self.ids_from_chars(input_chars).to_tensor()
-
+    
     # Run the model.
     # predicted_logits.shape is [batch, char, next_char_logits]
     predicted_logits = self.model(inputs=input_ids)
@@ -166,19 +218,6 @@ class OneStep(tf.keras.Model):
     return predicted_chars
 
 
-def get_model(vocab_size, embedding_dim, rnn_units, batch_size):
-  model = build_model(vocab_size, embedding_dim, rnn_units, batch_size)
-  # model = MyModel(
-  #     vocab_size=vocab_size,
-  #     embedding_dim=embedding_dim,
-  #     rnn_units=rnn_units)
-
-  loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
-
-  model.compile(optimizer='adam', loss=loss)
-
-  return model
-
 
 def train_model(model, dataset, checkpoint_dir, epochs):
   # Name of the checkpoint files
@@ -193,58 +232,71 @@ def train_model(model, dataset, checkpoint_dir, epochs):
 
 
 def test_model(model, chars_from_ids, ids_from_chars, prompt, temperature=1.0):
-  one_step_model = OneStep(model, chars_from_ids, ids_from_chars, temperature)
+    # with open('/Users/vuonggiahuy/rnn-training-2/data/shakepeare1/shakespeare.json', 'r') as f:
+    #    collection = json.load(f)
+    one_step_model = OneStep(model, chars_from_ids, ids_from_chars, temperature)
 
-  start = time.time()
-  next_char = tf.constant([prompt])
-  result = [next_char]
+    start = time.time()
+    next_char = tf.constant([prompt for _ in range(1024)])
+    result = [next_char]
+    word = ""
 
-  for n in range(1000):
-    next_char = one_step_model.generate_one_step(next_char)
-    result.append(next_char)
+    for n in range(1000):
+        next_char = one_step_model.generate_one_step(next_char)
+        result.append(next_char)
 
-  result = tf.strings.join(result)
+    result = tf.strings.join(result)
 
-  end = time.time()
-  print(result[0].numpy().decode('utf-8'), '\n\n' + '_'*80)
-  print('\nRun time:', end - start)
+    end = time.time()
+    context = result[-1].numpy().decode('utf-8')
+    # result = ""
+    # word = ""
+    # i = 0
+    # while i < len(context) - 1:
+    #     if context[i + 1] == " " or context[i + 1] == "\n":
+    #         new_word = process.extract(word, collection, scorer=fuzz.ratio)[0][0]
+    #         result += new_word
+    #         result += context[i + 1]
+    #         word = ""
+    #         i = i + 2
+    #     else:
+    #         word += context[i]
+    #         i = i + 1
+    print(context)
+    print('\nRun time:', end - start)
 
 
 def main():
-  # The embedding dimension
-  embedding_dim = 32
-  # Number of RNN units
-  rnn_units = 128
-  # Directory where the checkpoints will be saved
-  checkpoint_dir = './training_checkpoints'  
-  # # The embedding dimension
-  # embedding_dim = 256
-  # # Number of RNN units
-  # rnn_units = 1024
-  # # Directory where the checkpoints will be saved
-  # checkpoint_dir = './training_checkpoints_2'  
-  temperature = 0.5
-  prompt = 'ROMEO:\nIs the day so young?'
-  # prompt = 'First Citizen:\nSoft! who comes here?'
+    args = parse_args()
+    # The embedding dimension
+    config_path = args.config_path
+    data_dir = args.data_dir
 
-  batch_size = 128  
-  seq_length = 100
+    with open(config_path, "r") as f:
+        config = json.load(f)
 
-  text = get_text_from_file()
+    embedding_dim = config["embedding_dim"]
+    rnn_units = config["rnn_units"]
+    batch_size = config["batch_size"]
+    seq_length = config["seq_length"]
 
-  dataset, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
+    temperature = 0.7
+    prompt = 'Harry'
+    # prompt = ''
 
-  # Length of the vocabulary in StringLookup Layer
-  vocab_size = len(ids_from_chars.get_vocabulary())
+    datasets = glob.glob(os.path.join(data_dir, "*"))
+    text = ""
+    for dataset in datasets:
+        text += get_text_from_dataset(dataset)
+        text += "\n"
 
-  model = build_model(vocab_size, embedding_dim, rnn_units, batch_size=1)
-  model.load_weights(tf.train.latest_checkpoint(checkpoint_dir))
-  test_model(model, chars_from_ids, ids_from_chars, prompt, temperature)
+    dataset, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
 
-  data = json.loads(model.to_json())
+    # Length of the vocabulary in StringLookup Layer
+    
+    model = tf.keras.models.load_model(args.checkpoint_path)
+    print(model.summary())
+    test_model(model, chars_from_ids, ids_from_chars, prompt, temperature)
 
-  # config = data["config"]["layers"]
-  # write_to_file("model_config.json", model.to_json())
-
-
-main()  
+if __name__ == "__main__":
+    main()
