@@ -59,53 +59,8 @@ def create_dataset_from_text(text_list, seq_length):
     # normalize input
     inputs = inputs / float(vocab_size)
     targets = np.array(targets)  
-
     
     return inputs, targets, vocab_to_index
-
-class OneStep():
-    def __init__(self, model, chars_from_ids, ids_from_chars, temperature=1.0):
-        self.temperature = temperature
-        self.model = model
-        self.chars_from_ids = chars_from_ids
-        self.ids_from_chars = ids_from_chars
-
-        # Create a mask to prevent "[UNK]" from being generated.
-        skip_ids = self.ids_from_chars(['[UNK]'])[:, None]
-        sparse_mask = tf.SparseTensor(
-            # Put a -inf at each bad index.
-            values=[-float('inf')] * len(skip_ids),
-            indices=skip_ids,
-            # Match the shape to the vocabulary
-            dense_shape=[len(ids_from_chars.get_vocabulary())])
-        self.prediction_mask = tf.sparse.to_dense(sparse_mask)
-
-    def generate_one_step(self, inputs):
-        # Convert strings to token IDs.
-        input_chars = tf.strings.unicode_split(inputs, 'UTF-8')
-        input_ids = self.ids_from_chars(input_chars).to_tensor()
-
-        # Run the model.
-        # predicted_logits.shape is [batch, char, next_char_logits]
-        predicted_logits = self.model(inputs=input_ids)
-        # Only use the last prediction.
-        predicted_logits = predicted_logits[:, -1, :]
-
-        # print(predicted_logits)
-
-        predicted_logits = predicted_logits / self.temperature
-        # Apply the prediction mask: prevent "[UNK]" from being generated.
-        predicted_logits = predicted_logits + self.prediction_mask
-
-        # Sample the output logits to generate token IDs.
-        predicted_ids = tf.random.categorical(predicted_logits, num_samples=1)
-        predicted_ids = tf.squeeze(predicted_ids, axis=-1)
-
-        # Convert from token ids to characters
-        predicted_chars = self.chars_from_ids(predicted_ids)
-
-        # Return the characters and model state.
-        return predicted_chars
 
 def create_model(config, model_path = None):
     if model_path is not None:
@@ -118,16 +73,18 @@ def create_model(config, model_path = None):
     sequence_length = config["seq_length"]
 
     model = tf.keras.models.Sequential([
-        tf.keras.layers.InputLayer(input_shape=(sequence_length, 1)),
+        tf.keras.layers.InputLayer(input_shape=(sequence_length,)),
         tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=sequence_length),
         tf.keras.layers.LSTM(units=rnn_units, return_sequences=True),
         tf.keras.layers.LSTM(units=rnn_units),
-        tf.keras.layers.Dense(vocab_size, activation="softmax")
+        tf.keras.layers.Dense(vocab_size)
     ])
     # load pretrained weight
     loss = tf.losses.SparseCategoricalCrossentropy()
     optimizer = tf.optimizers.Adam(learning_rate=0.001)
     model.compile(optimizer = optimizer, loss = loss)
+
+    model.summary()
     return model
 
 def compressConfig(data):
@@ -229,10 +186,6 @@ def main():
 
     with open(config_path, "r") as f:
         config = json.load(f)
-    batch_size = config["batch_size"]
-    seq_length = config["seq_length"]
-    epochs = config["epoch_num"]
-
 
     datasets = glob.glob(os.path.join(data_dir, "*"))
     text = ""
@@ -241,38 +194,31 @@ def main():
         text += "\n" 
 
     # from text to characters list
-    text = list(text)
-    print(text)
-  
-    # inputs, targets, vocab_to_index = create_dataset_from_text(text, seq_length)
+    text = list(text)  
+    X, y, vocab_to_index = create_dataset_from_text(text, config["seq_length"])
+    vocabulary = list(vocab_to_index.keys())
+    config["vocab_size"] = len(vocabulary)
+    model = create_model(config, ckpt)
 
-    # vocabulary = list(vocab_to_index.keys())
-
-    # config["vocab_size"] = len(vocabulary)
-    # model = create_model(config, ckpt)
-
-    # checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-    #     filepath=os.path.join(output_dir, "model.h5"),
-    #     save_best_only=True,
-    #     monitor='loss',
-    #     mode='min'    
-    # )
-    # model.fit(train_ds, epochs=epochs, callbacks = [checkpoint_callback])
-
-    # model.summary()
-
-    # # model.save(os.path.join(output_dir, "model.h5"))
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=os.path.join(output_dir, "model.h5"),
+        save_best_only=True,
+        monitor='loss',
+        mode='min'    
+    )
     
-    # weight_base64, compressed_config = get_model_for_export(model)
+    model.fit(X, y, batch_size = config["batch_size"], epochs=config["epoch_num"], callbacks = [checkpoint_callback])
+    
+    weight_base64, compressed_config = get_model_for_export(model)
 
-    # inscription = {
-    #     "model_name": "RNN",
-    #     "layers_config": compressed_config,
-    #     "vocabulary": vocabulary,
-    #     "weight_b64": weight_base64
-    # }
-    # inscription_json = json.dumps(inscription)
-    # write_to_file(os.path.join(output_dir, "model.json"), inscription_json)
+    inscription = {
+        "model_name": "RNN",
+        "layers_config": compressed_config,
+        "vocabulary": vocabulary,
+        "weight_b64": weight_base64
+    }
+    inscription_json = json.dumps(inscription)
+    write_to_file(os.path.join(output_dir, "model.json"), inscription_json)
     
 
 if __name__ == "__main__":
