@@ -81,7 +81,7 @@ def create_model(config, model_path = None):
         tf.keras.layers.Dense(vocab_size)
     ])
     # load pretrained weight
-    loss = tf.losses.SparseCategoricalCrossentropy()
+    loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     optimizer = tf.optimizers.Adam(learning_rate=0.001)
     model.compile(optimizer = optimizer, loss = loss)
 
