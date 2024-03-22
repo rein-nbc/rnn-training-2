@@ -194,20 +194,11 @@ def main():
         text += get_text_from_dataset(dataset)
         text += "\n" 
 
-    tmpfile = tmp.NamedTemporaryFile()
-    # from text to characters list
     text = list(text)  
     X, y, vocab_to_index = create_dataset_from_text(text, config["seq_length"])
     vocabulary = list(vocab_to_index.keys())
     config["vocab_size"] = len(vocabulary)
     model = create_model(config, ckpt)
-
-    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=tmpfile,
-        save_best_only=True,
-        monitor='loss',
-        mode='min'    
-    )
     
     model.fit(X, y, batch_size = config["batch_size"], epochs=config["epoch_num"], callbacks = [checkpoint_callback])
     
