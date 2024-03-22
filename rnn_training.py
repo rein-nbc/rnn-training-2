@@ -16,6 +16,7 @@ import struct
 import base64
 import argparse
 import numpy as np 
+import tempfile as tmp
 import tensorflow as tf
 
 VAL_PERCENT = 20
@@ -24,7 +25,7 @@ def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
     parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
-    parser.add_argument("--output-dir", type=str, default = "./output", help="Path to the output directory")
+    parser.add_argument("--output-path", type=str, default = "model.json", help="Path to the output file")
     parser.add_argument("--checkpoint-path", type =str, default=None, help="Path to the checkpoint file")
     return parser.parse_args()
 
@@ -181,7 +182,7 @@ def main():
     # The embedding dimension
     config_path = args.config_path
     data_dir = args.data_dir
-    output_dir = args.output_dir
+    output_dir = args.output_path
     ckpt = args.checkpoint_path
 
     with open(config_path, "r") as f:
@@ -193,6 +194,7 @@ def main():
         text += get_text_from_dataset(dataset)
         text += "\n" 
 
+    tmpfile = tmp.NamedTemporaryFile()
     # from text to characters list
     text = list(text)  
     X, y, vocab_to_index = create_dataset_from_text(text, config["seq_length"])
@@ -201,7 +203,7 @@ def main():
     model = create_model(config, ckpt)
 
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(output_dir, "model.h5"),
+        filepath=tmpfile,
         save_best_only=True,
         monitor='loss',
         mode='min'    
