@@ -11,12 +11,11 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
 import glob
-import time
 import json
 import struct
 import base64
 import argparse
-import tempfile 
+import numpy as np 
 import tensorflow as tf
 
 VAL_PERCENT = 20
@@ -39,54 +38,30 @@ def write_to_file(file_path, content):
     with open(file_path, "w") as f:
         f.write(content)
 
-def create_dataset_from_text(text, batch_size, seq_length, val_percent=VAL_PERCENT):
-  # The unique characters in the file
-  vocab = sorted(set(text))
+def create_dataset_from_text(text_list, seq_length):
+    # The unique characters in the file
+    assert isinstance(text_list, list)
+    vocab = sorted(set(item for item in text_list))
+    vocab_to_index = dict((note, number) for number, note in enumerate(vocab)) 
+    vocab_size = len(vocab)
 
-  ids_from_chars = tf.keras.layers.StringLookup(vocabulary=list(vocab), mask_token=None)
-
-  chars_from_ids = tf.keras.layers.StringLookup(
-      vocabulary=ids_from_chars.get_vocabulary(), invert=True, mask_token=None)
-  
-  def text_from_ids(ids):
-    return tf.strings.reduce_join(chars_from_ids(ids), axis=-1)
-
-  all_ids = ids_from_chars(tf.strings.unicode_split(text, 'UTF-8'))
-
-  val_start = int(len(all_ids) * (1 - val_percent/100))
-  train_ids, val_ids = all_ids[:val_start], all_ids[val_start:]
-
-  def get_dataset(all_ids):
-    ids_dataset = tf.data.Dataset.from_tensor_slices(all_ids)
-
-    sequences = ids_dataset.batch(seq_length+1, drop_remainder=True)
-
-    def split_input_target(sequence):
-        input_text = sequence[:-1]
-        target_text = sequence[1:]
-        return input_text, target_text
-
-    dataset = sequences.map(split_input_target)
-
-    # Buffer size to shuffle the dataset
-    # (TF data is designed to work with possibly infinite sequences,
-    # so it doesn't attempt to shuffle the entire sequence in memory. Instead,
-    # it maintains a buffer in which it shuffles elements).
-    BUFFER_SIZE = 10000
-
-    dataset = (
-        dataset
-        .shuffle(BUFFER_SIZE)
-        .batch(batch_size, drop_remainder=True)
-        .prefetch(tf.data.experimental.AUTOTUNE))
+    inputs = []
+    targets = []
+    # create input sequences and the corresponding outputs
+    for i in range(0, len(text_list) - seq_length):
+        sequence_in = text_list[i:i + seq_length]
+        sequence_out = text_list[i + seq_length]
+        inputs.append([vocab_to_index[char] for char in sequence_in])
+        targets.append([vocab_to_index[sequence_out]])
     
-    return dataset
-  
-  # train_ds, val_ds = tf.keras.utils.split_dataset(dataset, left_size=1-val_percent/100, shuffle=True, seed=shuffle_seed)
-  train_ds = get_dataset(all_ids)
-  val_ds = get_dataset(val_ids)
+    # reshape the input into a format compatible with LSTM layers
+    inputs = np.reshape(inputs, (len(inputs), seq_length))
+    # normalize input
+    inputs = inputs / float(vocab_size)
+    targets = np.array(targets)  
 
-  return train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids
+    
+    return inputs, targets, vocab_to_index
 
 class OneStep():
     def __init__(self, model, chars_from_ids, ids_from_chars, temperature=1.0):
@@ -145,15 +120,12 @@ def create_model(config, model_path = None):
     model = tf.keras.models.Sequential([
         tf.keras.layers.InputLayer(input_shape=(sequence_length, 1)),
         tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=sequence_length),
-        tf.keras.layers.LSTM(units=rnn_units, return_sequences=True, stateful=True),
-        tf.keras.layers.LSTM(units=rnn_units, return_sequences=True, stateful=True)
+        tf.keras.layers.LSTM(units=rnn_units, return_sequences=True),
+        tf.keras.layers.LSTM(units=rnn_units),
+        tf.keras.layers.Dense(vocab_size, activation="softmax")
     ])
-    
-
-    model.add(tf.keras.layers.Dense(vocab_size))
-    return model
     # load pretrained weight
-    loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
+    loss = tf.losses.SparseCategoricalCrossentropy()
     optimizer = tf.optimizers.Adam(learning_rate=0.001)
     model.compile(optimizer = optimizer, loss = loss)
     return model
@@ -265,38 +237,42 @@ def main():
     datasets = glob.glob(os.path.join(data_dir, "*"))
     text = ""
     for dataset in datasets:
-      text += get_text_from_dataset(dataset)
-      text += "\n"
+        text += get_text_from_dataset(dataset)
+        text += "\n" 
+
+    # from text to characters list
+    text = list(text)
+    print(text)
   
-    train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
+    # inputs, targets, vocab_to_index = create_dataset_from_text(text, seq_length)
 
-    vocabulary = ids_from_chars.get_vocabulary()
+    # vocabulary = list(vocab_to_index.keys())
 
-    config["vocab_size"] = len(vocabulary)
-    model = create_model(config, ckpt)
+    # config["vocab_size"] = len(vocabulary)
+    # model = create_model(config, ckpt)
 
-    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=os.path.join(output_dir, "model.h5"),
-        save_best_only=True,
-        monitor='loss',
-        mode='min'    
-    )
-    model.fit(train_ds, epochs=epochs, callbacks = [checkpoint_callback])
+    # checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+    #     filepath=os.path.join(output_dir, "model.h5"),
+    #     save_best_only=True,
+    #     monitor='loss',
+    #     mode='min'    
+    # )
+    # model.fit(train_ds, epochs=epochs, callbacks = [checkpoint_callback])
 
-    model.summary()
+    # model.summary()
 
-    # model.save(os.path.join(output_dir, "model.h5"))
+    # # model.save(os.path.join(output_dir, "model.h5"))
     
-    weight_base64, compressed_config = get_model_for_export(model)
+    # weight_base64, compressed_config = get_model_for_export(model)
 
-    inscription = {
-        "model_name": "RNN",
-        "layers_config": compressed_config,
-        "vocabulary": vocabulary,
-        "weight_b64": weight_base64
-    }
-    inscription_json = json.dumps(inscription)
-    write_to_file(os.path.join(output_dir, "model.json"), inscription_json)
+    # inscription = {
+    #     "model_name": "RNN",
+    #     "layers_config": compressed_config,
+    #     "vocabulary": vocabulary,
+    #     "weight_b64": weight_base64
+    # }
+    # inscription_json = json.dumps(inscription)
+    # write_to_file(os.path.join(output_dir, "model.json"), inscription_json)
     
 
 if __name__ == "__main__":
