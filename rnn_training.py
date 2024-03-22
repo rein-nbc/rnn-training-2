@@ -88,35 +88,6 @@ def create_dataset_from_text(text, batch_size, seq_length, val_percent=VAL_PERCE
 
   return train_ds, val_ds, chars_from_ids, ids_from_chars, text_from_ids
 
-def build_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path = None):
-
-    if model_path is not None:
-        model = tf.keras.models.load_model(model_path)
-        return model
-
-    model = tf.keras.models.Sequential()
-
-    model.add(tf.keras.layers.Embedding(
-        input_dim=vocab_size,
-        output_dim=embedding_dim,
-        batch_input_shape=[batch_size, None]
-    ))
-    
-    model.add(tf.keras.layers.LSTM(
-        units = rnn_units,
-        return_sequences=True,
-        stateful=True,
-    ))
-
-    model.add(tf.keras.layers.LSTM(
-        units = rnn_units,
-        return_sequences=True,
-        stateful=True,
-    ))
-
-    model.add(tf.keras.layers.Dense(vocab_size))
-    return model
-
 class OneStep():
     def __init__(self, model, chars_from_ids, ids_from_chars, temperature=1.0):
         self.temperature = temperature
@@ -161,8 +132,39 @@ class OneStep():
         # Return the characters and model state.
         return predicted_chars
 
-def get_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path = None):
-    model = build_model(vocab_size, embedding_dim, rnn_units, batch_size, model_path)
+def create_model(config, model_path = None):
+    if model_path is not None:
+        model = tf.keras.models.load_model(model_path)
+        return model
+    
+    embedding_dim = config["embedding_dim"]
+    rnn_units = config["rnn_units"]
+    vocab_size = config["vocab_size"]
+    sequence_length = config["seq_length"]
+
+    model = tf.keras.models.Sequential()
+
+    model.add(tf.keras.layers.Embedding(
+        input_dim=vocab_size,
+        output_dim=embedding_dim,
+        input_length = sequence_length,
+
+    ))
+    
+    model.add(tf.keras.layers.LSTM(
+        units = rnn_units,
+        return_sequences=True,
+        stateful=True,
+    ))
+
+    model.add(tf.keras.layers.LSTM(
+        units = rnn_units,
+        return_sequences=True,
+        stateful=True,
+    ))
+
+    model.add(tf.keras.layers.Dense(vocab_size))
+    return model
     # load pretrained weight
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     optimizer = tf.optimizers.Adam(learning_rate=0.001)
@@ -268,8 +270,6 @@ def main():
 
     with open(config_path, "r") as f:
         config = json.load(f)
-    embedding_dim = config["embedding_dim"]
-    rnn_units = config["rnn_units"]
     batch_size = config["batch_size"]
     seq_length = config["seq_length"]
     epochs = config["epoch_num"]
@@ -285,9 +285,8 @@ def main():
 
     vocabulary = ids_from_chars.get_vocabulary()
 
-
-    vocab_size = len(vocabulary)
-    model = get_model(vocab_size, embedding_dim, rnn_units, batch_size, ckpt)
+    config["vocab_size"] = len(vocabulary)
+    model = create_model(config, ckpt)
 
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=os.path.join(output_dir, "model.h5"),
