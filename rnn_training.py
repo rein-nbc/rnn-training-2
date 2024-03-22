@@ -200,7 +200,7 @@ def main():
     config["vocab_size"] = len(vocabulary)
     model = create_model(config, ckpt)
     
-    model.fit(X, y, batch_size = config["batch_size"], epochs=config["epoch_num"], callbacks = [checkpoint_callback])
+    model.fit(X, y, batch_size = config["batch_size"], epochs=config["epoch_num"])
     
     weight_base64, compressed_config = get_model_for_export(model)
 
