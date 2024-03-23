@@ -14,9 +14,9 @@ import glob
 import json
 import struct
 import base64
+import pickle
 import argparse
 import numpy as np 
-import tempfile as tmp
 import tensorflow as tf
 
 VAL_PERCENT = 20
@@ -27,6 +27,7 @@ def parse_args():
     parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
     parser.add_argument("--output-path", type=str, default = "model.json", help="Path to the output file")
     parser.add_argument("--checkpoint-path", type =str, default=None, help="Path to the checkpoint file")
+    parser.add_argument("--resume-data-path", type =str, default=None, help="Path to the resume data file")
     return parser.parse_args()
 
 def get_file_content(file_path):
@@ -185,16 +186,23 @@ def main():
     data_dir = args.data_dir
     output_path = args.output_path
     ckpt = args.checkpoint_path
+    resume_data_path = args.resume_data_path
 
     with open(config_path, "r") as f:
         config = json.load(f)
-
-    datasets = glob.glob(os.path.join(data_dir, "*"))
     text = ""
-    for dataset in datasets:
-        text += get_text_from_dataset(dataset)
-        text += "\n" 
-    text = list(text)
+    if not os.path.exists(resume_data_path):
+        datasets = glob.glob(os.path.join(data_dir, "*"))
+        for dataset in datasets:
+            text += get_text_from_dataset(dataset)
+            text += "\n" 
+        text = list(text)
+        with open(resume_data_path, 'wb') as f:
+            pickle.dump(text, f)
+    else:
+        with open(resume_data_path, 'rb') as f:
+            text = pickle.load(f)
+
     X, y, vocab_to_index = create_dataset_from_text(text, config["seq_length"])
     vocabulary = list(vocab_to_index.keys())
     config["vocab_size"] = len(vocabulary)

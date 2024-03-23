@@ -249,19 +249,6 @@ def test_model(model, chars_from_ids, ids_from_chars, prompt, temperature=1.0):
 
     end = time.time()
     context = result[-1].numpy().decode('utf-8')
-    # result = ""
-    # word = ""
-    # i = 0
-    # while i < len(context) - 1:
-    #     if context[i + 1] == " " or context[i + 1] == "\n":
-    #         new_word = process.extract(word, collection, scorer=fuzz.ratio)[0][0]
-    #         result += new_word
-    #         result += context[i + 1]
-    #         word = ""
-    #         i = i + 2
-    #     else:
-    #         word += context[i]
-    #         i = i + 1
     print(context)
     print('\nRun time:', end - start)
 
