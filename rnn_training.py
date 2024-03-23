@@ -182,7 +182,7 @@ def main():
     # The embedding dimension
     config_path = args.config_path
     data_dir = args.data_dir
-    output_dir = args.output_path
+    output_path = args.output_path
     ckpt = args.checkpoint_path
 
     with open(config_path, "r") as f:
@@ -211,7 +211,7 @@ def main():
         "weight_b64": weight_base64
     }
     inscription_json = json.dumps(inscription)
-    write_to_file(os.path.join(output_dir, "model.json"), inscription_json)
+    write_to_file(output_path, inscription_json)
     
 
 if __name__ == "__main__":
