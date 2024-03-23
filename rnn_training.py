@@ -41,7 +41,7 @@ def write_to_file(file_path, content):
 
 def create_dataset_from_text(text_list, seq_length):
     # The unique characters in the file
-    assert isinstance(text_list, list)
+    text_list.append(['UNK'])
     vocab = sorted(set(item for item in text_list))
     vocab_to_index = dict((note, number) for number, note in enumerate(vocab)) 
     vocab_size = len(vocab)
