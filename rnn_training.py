@@ -182,7 +182,6 @@ def get_text_from_dir(dir):
                 list_files_recursive(full_path)
             elif os.path.isfile(full_path):
                 file_paths.append(full_path)
-
     list_files_recursive(dir)
 
     for data_path in file_paths:
@@ -213,7 +212,7 @@ def main():
     with open(config_path, "r") as f:
         config = json.load(f)
     
-    resume_path = os.path.join(output_dir, "data.pkl")
+    resume_path = os.path.join(output_dir, "data.pickle")
     text = get_text_from_dir(data_dir)
     with open(resume_path, 'wb') as f:
         pickle.dump(text, f)
@@ -223,6 +222,7 @@ def main():
     vocabulary = list(vocab_to_index.keys())
     config["vocab_size"] = len(vocabulary)
     model = create_model(config, ckpt)
+
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=os.path.join(output_dir, "model.h5"),
         save_best_only=True,
