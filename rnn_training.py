@@ -16,6 +16,7 @@ import struct
 import base64
 import pickle
 import argparse
+from tqdm import tqdm
 import numpy as np 
 import tensorflow as tf
 
@@ -25,9 +26,8 @@ def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
     parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
-    parser.add_argument("--output-path", type=str, default = "model.json", help="Path to the output file")
+    parser.add_argument("--output-path", type=str, default = "./model.json", help="Path to the output file")
     parser.add_argument("--checkpoint-path", type =str, default=None, help="Path to the checkpoint file")
-    parser.add_argument("--resume-data-path", type =str, default=None, help="Path to the resume data file")
     return parser.parse_args()
 
 def get_file_content(file_path):
@@ -46,7 +46,6 @@ def create_dataset_from_text(text_list, seq_length):
     # add [UNK] token
     vocab.append("[UNK]")
     vocab_to_index = dict((note, number) for number, note in enumerate(vocab)) 
-    vocab_size = len(vocab)
 
     inputs = []
     targets = []
@@ -59,8 +58,6 @@ def create_dataset_from_text(text_list, seq_length):
     
     # reshape the input into a format compatible with LSTM layers
     inputs = np.reshape(inputs, (len(inputs), seq_length))
-    # normalize input
-    inputs = inputs / float(vocab_size)
     targets = np.array(targets)  
     
     return inputs, targets, vocab_to_index
@@ -78,6 +75,7 @@ def create_model(config, model_path = None):
     model = tf.keras.models.Sequential([
         tf.keras.layers.InputLayer(input_shape=(sequence_length,)),
         tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=sequence_length),
+        tf.keras.layers.LSTM(units=rnn_units, return_sequences=True),
         tf.keras.layers.LSTM(units=rnn_units, return_sequences=True),
         tf.keras.layers.LSTM(units=rnn_units),
         tf.keras.layers.Dense(vocab_size)
@@ -165,19 +163,41 @@ def get_model_for_export(model):
     weight_base64 = base64.b64encode(weight_bytes).decode()
     config = json.loads(model.to_json())
     compressed_config = compressConfig(config)
-    return weight_base64, compressed_config 
+    return weight_base64, compressed_config
 
-def get_text_from_dataset(dir):
-  data_paths = glob.glob(os.path.join(dir, "*.txt"))
-  def get_text_from_file(file_path):
-      # Read, then decode for py2 compat.
-      text = open(file_path, 'rb').read().decode(encoding='utf-8')
-      return text
-  text = ""
-  for data_path in data_paths:
-      text += get_text_from_file(data_path)
-      text += "\n"
-  return text
+def get_text_from_file(file_path):
+    # Read, then decode for py2 compat.
+    text = open(file_path, 'rb').read().decode(encoding='utf-8')
+    return text 
+
+def get_text_from_dir(dir):
+
+    text = ""
+    file_paths = []
+
+    def list_files_recursive(directory):
+        for entry in os.listdir(directory):
+            full_path = os.path.join(directory, entry)
+            if os.path.isdir(full_path):
+                list_files_recursive(full_path)
+            elif os.path.isfile(full_path):
+                file_paths.append(full_path)
+
+    list_files_recursive(dir)
+
+    for data_path in file_paths:
+        if data_path.endswith(".txt"):
+            text += get_text_from_file(data_path)
+            text += "\n"
+        elif data_path.endswith(".pickle"):
+            with open(data_path, 'rb') as f:
+                data = pickle.load(f)
+                text += data
+                text += "\n"
+        else:
+            continue
+
+    return text
 
 def main():
     args = parse_args()
@@ -186,28 +206,18 @@ def main():
     data_dir = args.data_dir
     output_path = args.output_path
     ckpt = args.checkpoint_path
-    resume_data_path = args.resume_data_path
 
     with open(config_path, "r") as f:
         config = json.load(f)
-    text = ""
-    if not os.path.exists(resume_data_path):
-        datasets = glob.glob(os.path.join(data_dir, "*"))
-        for dataset in datasets:
-            text += get_text_from_dataset(dataset)
-            text += "\n" 
-        text = list(text)
-        with open(resume_data_path, 'wb') as f:
-            pickle.dump(text, f)
-    else:
-        with open(resume_data_path, 'rb') as f:
-            text = pickle.load(f)
+    
+    text = get_text_from_dir(data_dir)
+    text = list(text)
 
     X, y, vocab_to_index = create_dataset_from_text(text, config["seq_length"])
     vocabulary = list(vocab_to_index.keys())
     config["vocab_size"] = len(vocabulary)
     model = create_model(config, ckpt)
-    
+        
     model.fit(X, y, batch_size = config["batch_size"], epochs=config["epoch_num"])
     
     weight_base64, compressed_config = get_model_for_export(model)
