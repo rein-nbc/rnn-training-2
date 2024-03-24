@@ -83,7 +83,7 @@ def create_model(config, model_path = None):
     # load pretrained weight
     loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
     optimizer = tf.optimizers.Adam(learning_rate=0.001)
-    model.compile(optimizer = optimizer, loss = loss, metric = ["accuracy"])
+    model.compile(optimizer = optimizer, loss = loss)
 
     model.summary()
     return model
