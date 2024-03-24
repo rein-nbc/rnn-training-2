@@ -14,7 +14,9 @@ import glob
 import json
 import struct
 import base64
+import pickle
 import argparse
+from tqdm import tqdm
 import numpy as np 
 import tensorflow as tf
 
@@ -40,10 +42,10 @@ def write_to_file(file_path, content):
 
 def create_dataset_from_text(text_list, seq_length):
     # The unique characters in the file
-    assert isinstance(text_list, list)
     vocab = sorted(set(item for item in text_list))
+    # add [UNK] token
+    vocab.append("[UNK]")
     vocab_to_index = dict((note, number) for number, note in enumerate(vocab)) 
-    vocab_size = len(vocab)
 
     inputs = []
     targets = []
@@ -56,8 +58,6 @@ def create_dataset_from_text(text_list, seq_length):
     
     # reshape the input into a format compatible with LSTM layers
     inputs = np.reshape(inputs, (len(inputs), seq_length))
-    # normalize input
-    inputs = inputs / float(vocab_size)
     targets = np.array(targets)  
     
     return inputs, targets, vocab_to_index
@@ -162,19 +162,41 @@ def get_model_for_export(model):
     weight_base64 = base64.b64encode(weight_bytes).decode()
     config = json.loads(model.to_json())
     compressed_config = compressConfig(config)
-    return weight_base64, compressed_config 
+    return weight_base64, compressed_config
 
-def get_text_from_dataset(dir):
-  data_paths = glob.glob(os.path.join(dir, "*.txt"))
-  def get_text_from_file(file_path):
-      # Read, then decode for py2 compat.
-      text = open(file_path, 'rb').read().decode(encoding='utf-8')
-      return text
-  text = ""
-  for data_path in data_paths:
-      text += get_text_from_file(data_path)
-      text += "\n"
-  return text
+def get_text_from_file(file_path):
+    # Read, then decode for py2 compat.
+    text = open(file_path, 'rb').read().decode(encoding='utf-8')
+    return text 
+
+def get_text_from_dir(dir):
+
+    text = ""
+    file_paths = []
+
+    def list_files_recursive(directory):
+        for entry in os.listdir(directory):
+            full_path = os.path.join(directory, entry)
+            if os.path.isdir(full_path):
+                list_files_recursive(full_path)
+            elif os.path.isfile(full_path):
+                file_paths.append(full_path)
+
+    list_files_recursive(dir)
+
+    for data_path in file_paths:
+        if data_path.endswith(".txt"):
+            text += get_text_from_file(data_path)
+            text += "\n"
+        elif data_path.endswith(".pickle"):
+            with open(data_path, 'rb') as f:
+                data = pickle.load(f)
+                text += data
+                text += "\n"
+        else:
+            continue
+
+    return text
 
 def main():
     args = parse_args()
@@ -184,30 +206,31 @@ def main():
     output_dir = args.output_dir
     ckpt = args.checkpoint_path
 
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     with open(config_path, "r") as f:
         config = json.load(f)
+    
+    resume_path = os.path.join(output_dir, "data.pkl")
+    text = get_text_from_dir(data_dir)
+    with open(resume_path, 'wb') as f:
+        pickle.dump(text, f)
+    text = list(text)
 
-    datasets = glob.glob(os.path.join(data_dir, "*"))
-    text = ""
-    for dataset in datasets:
-        text += get_text_from_dataset(dataset)
-        text += "\n" 
-
-    # from text to characters list
-    text = list(text)  
     X, y, vocab_to_index = create_dataset_from_text(text, config["seq_length"])
     vocabulary = list(vocab_to_index.keys())
     config["vocab_size"] = len(vocabulary)
     model = create_model(config, ckpt)
-
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=os.path.join(output_dir, "model.h5"),
         save_best_only=True,
-        monitor='loss',
-        mode='min'    
+        monitor="loss",
+        mode="min",
+        verbose = 1,
     )
-    
-    model.fit(X, y, batch_size = config["batch_size"], epochs=config["epoch_num"], callbacks = [checkpoint_callback])
+        
+    model.fit(X, y, batch_size = config["batch_size"], epochs=config["epoch_num"], callbacks=[checkpoint_callback])
     
     weight_base64, compressed_config = get_model_for_export(model)
 
