@@ -65,12 +65,14 @@ def create_model(config, model_path = None):
         model = tf.keras.models.load_model(model_path)
         return model
     
+    embedding_dim = config["embedding_dim"]
     rnn_units = config["rnn_units"]
     vocab_size = config["vocab_size"]
     sequence_length = config["seq_length"]
 
     model = tf.keras.models.Sequential([
-        tf.keras.layers.InputLayer(input_shape=(sequence_length, 1)),
+        tf.keras.layers.InputLayer(input_shape=(sequence_length,)),
+        tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=sequence_length),
         tf.keras.layers.LSTM(units=rnn_units),
         tf.keras.layers.Dense(vocab_size)
     ])
