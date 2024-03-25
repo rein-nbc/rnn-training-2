@@ -9,10 +9,11 @@ Original file is located at
 
 import tensorflow as tf
 import os
-import time
 import json
 import argparse
 import glob
+import numpy as np
+
 
 
 def parse_args():
@@ -169,50 +170,28 @@ def create_dataset_from_text(text, batch_size, seq_length):
 
 
 
-class OneStep(tf.keras.Model):
-  def __init__(self, model, vocab, temperature=1.0):
-    super().__init__()
-    self.temperature = temperature
-    self.model = model
-    self.vocabulary = vocab
+def generate_charactor(prompt, vocab, model, seq_length = 40, to_generate = 10):
+    input_chars = list(prompt)
+    input_chars = input_chars[-seq_length:]
+    for i in range(seq_length - len(input_notes)):
+        input_notes.insert(0, np.random.choice(vocab))
+    prediction_output = []
 
-    # Create a mask to prevent "[UNK]" from being generated.
-    skip_ids = [self.vocabulary.index("[UNK]")]
-    sparse_mask = tf.SparseTensor(
-        # Put a -inf at each bad index.
-        values=[-float('inf')]*len(skip_ids),
-        indices=[[i, skip_ids] for i in range(len(skip_ids))],
-        # Match the shape to the vocabulary
-        dense_shape=[len(self.vocabulary)])
-    sparse_mask = tf.sparse.reorder(sparse_mask)
-    self.prediction_mask = tf.sparse.to_dense(sparse_mask)
+    temperature = 1.0
+    for i in range(to_generate):
+        prediction_input = np.array(input_notes).reshape(1, seq_length)
+        prediction_logits = model.predict(prediction_input)
 
-  @tf.function
-  def generate_one_step(self, inputs):
-    # Convert strings to token IDs.
-    input_chars = tf.strings.unicode_split(inputs, 'UTF-8')
-    input_ids = [self.vocabulary.index(char) for char in input_chars]
-    input_ids = tf.expand_dims(input_ids, 0)
-    
-    # Run the model.f
-    # predicted_logits.shape is [batch, char, next_char_logits]
-    predicted_logits = self.model(inputs=input_ids)
+        prediction_logits = prediction_logits / temperature
 
-    # Only use the last prediction.
-    predicted_logits = predicted_logits[:, -1, :]
-    predicted_logits = predicted_logits/self.temperature
-    # Apply the prediction mask: prevent "[UNK]" from being generated.
-    predicted_logits = predicted_logits + self.prediction_mask
+        predicted_ids = tf.random.categorical(prediction_logits, num_samples=1)
+        prediction = tf.squeeze(predicted_ids, axis=-1)
+        # print(prediction)
 
-    # Sample the output logits to generate token IDs.
-    predicted_ids = tf.random.categorical(predicted_logits, num_samples=1)
-    predicted_ids = tf.squeeze(predicted_ids, axis=-1)
+        prediction_output.append(vocab[prediction[0]])
+        input_notes = input_notes[1:] + [vocab[prediction[0]]]
 
-    # Convert from token ids to characters
-    predicted_chars = self.vocabulary(predicted_ids)
-
-    # Return the characters and model state.
-    return predicted_chars
+    return prediction_output
 
 
 
@@ -228,28 +207,6 @@ def train_model(model, dataset, checkpoint_dir, epochs):
   model.fit(dataset, epochs=epochs, callbacks=[checkpoint_callback])
 
 
-def test_model(model, vocab, prompt, temperature=1.0):
-    # with open('/Users/vuonggiahuy/rnn-training-2/data/shakepeare1/shakespeare.json', 'r') as f:
-    #    collection = json.load(f)
-    one_step_model = OneStep(model, vocab, temperature)
-
-    start = time.time()
-    next_char = tf.constant([prompt for _ in range(1024)])
-    result = [next_char]
-    word = ""
-
-    for n in range(1000):
-        next_char = one_step_model.generate_one_step(next_char)
-        result.append(next_char)
-
-    result = tf.strings.join(result)
-
-    end = time.time()
-    context = result[-1].numpy().decode('utf-8')
-    print(context)
-    print('\nRun time:', end - start)
-
-
 def main():
     args = parse_args()
     model_dir = args.model_dir
@@ -262,11 +219,12 @@ def main():
     
     temperature = 0.7
     prompt = 'Harry'
-    # prompt = ''
+    
     
     model = tf.keras.models.load_model(ckpt)
     print(model.summary())
-    test_model(model, vocab, prompt, temperature)
+    generated_prompt = generate_charactor(prompt, vocab, model, seq_length = config["seq_length"], to_generate = 100)
+    
 
 if __name__ == "__main__":
     main()
