@@ -65,7 +65,6 @@ def create_model(config, model_path = None):
         model = tf.keras.models.load_model(model_path)
         return model
     
-    embedding_dim = config["embedding_dim"]
     rnn_units = config["rnn_units"]
     vocab_size = config["vocab_size"]
     sequence_length = config["seq_length"]
