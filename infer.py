@@ -178,7 +178,8 @@ class OneStep(tf.keras.Model):
 
     # Create a mask to prevent "[UNK]" from being generated.
     # skip_ids = self.ids_from_chars(['[UNK]'])[:, None]
-    skip_ids = self.vocabulary.index('[UNK]')
+    skip_ids = tf.constant([self.vocabulary.index('[UNK]')])
+
 
     sparse_mask = tf.SparseTensor(
         # Put a -inf at each bad index.
