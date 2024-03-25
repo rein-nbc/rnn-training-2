@@ -56,7 +56,7 @@ def create_dataset_from_text(text_list, seq_length):
         targets.append([vocab_to_index[sequence_out]])
     
     # reshape the input into a format compatible with LSTM layers
-    inputs = np.reshape(inputs, (len(inputs), seq_length))
+    inputs = np.reshape(inputs, (len(inputs), seq_length, 1))/len(vocab)
     targets = np.array(targets)  
     
     return inputs, targets, vocab_to_index
@@ -66,15 +66,12 @@ def create_model(config, model_path = None):
         model = tf.keras.models.load_model(model_path)
         return model
     
-    embedding_dim = config["embedding_dim"]
     rnn_units = config["rnn_units"]
     vocab_size = config["vocab_size"]
     sequence_length = config["seq_length"]
 
     model = tf.keras.models.Sequential([
-        tf.keras.layers.InputLayer(input_shape=(sequence_length,)),
-        tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=sequence_length),
-        tf.keras.layers.LSTM(units=rnn_units, return_sequences=True),
+        tf.keras.layers.InputLayer(input_shape=(sequence_length, 1)),
         tf.keras.layers.LSTM(units=rnn_units),
         tf.keras.layers.Dense(vocab_size)
     ])
