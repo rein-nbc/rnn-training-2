@@ -177,7 +177,9 @@ class OneStep(tf.keras.Model):
     self.vocabulary = vocab
 
     # Create a mask to prevent "[UNK]" from being generated.
-    skip_ids = self.ids_from_chars(['[UNK]'])[:, None]
+    # skip_ids = self.ids_from_chars(['[UNK]'])[:, None]
+    skip_ids = self.vocabulary.index('[UNK]')
+
     sparse_mask = tf.SparseTensor(
         # Put a -inf at each bad index.
         values=[-float('inf')]*len(skip_ids),
@@ -193,7 +195,7 @@ class OneStep(tf.keras.Model):
     input_ids = [self.vocabulary.index(char) for char in input_chars]
     input_ids = tf.expand_dims(input_ids, 0)
     
-    # Run the model.
+    # Run the model.f
     # predicted_logits.shape is [batch, char, next_char_logits]
     predicted_logits = self.model(inputs=input_ids)
 
