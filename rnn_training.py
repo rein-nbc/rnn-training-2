@@ -20,8 +20,6 @@ from tqdm import tqdm
 import numpy as np 
 import tensorflow as tf
 
-VAL_PERCENT = 20
-
 def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
@@ -57,7 +55,7 @@ def create_dataset_from_text(text_list, seq_length):
         targets.append([vocab_to_index[sequence_out]])
     
     # reshape the input into a format compatible with LSTM layers
-    inputs = np.reshape(inputs, (len(inputs), seq_length))
+    inputs = np.reshape(inputs, (len(inputs), seq_length, 1))/len(vocab)
     targets = np.array(targets)  
     
     return inputs, targets, vocab_to_index
@@ -73,10 +71,7 @@ def create_model(config, model_path = None):
     sequence_length = config["seq_length"]
 
     model = tf.keras.models.Sequential([
-        tf.keras.layers.InputLayer(input_shape=(sequence_length,)),
-        tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=sequence_length),
-        tf.keras.layers.LSTM(units=rnn_units, return_sequences=True),
-        tf.keras.layers.LSTM(units=rnn_units, return_sequences=True),
+        tf.keras.layers.InputLayer(input_shape=(sequence_length, 1)),
         tf.keras.layers.LSTM(units=rnn_units),
         tf.keras.layers.Dense(vocab_size)
     ])
@@ -184,7 +179,7 @@ def get_text_from_dir(dir):
                 file_paths.append(full_path)
     list_files_recursive(dir)
 
-    for data_path in file_paths:
+    for data_path in tqdm(file_paths):
         if data_path.endswith(".txt"):
             text += get_text_from_file(data_path)
             text += "\n"
@@ -222,6 +217,7 @@ def main():
     vocabulary = list(vocab_to_index.keys())
     config["vocab_size"] = len(vocabulary)
     model = create_model(config, ckpt)
+
 
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=os.path.join(output_dir, "model.h5"),
