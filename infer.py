@@ -254,7 +254,7 @@ def main():
     model_dir = args.model_dir
 
     ckpt = os.path.join(model_dir, "model.h5")
-    model_config = os.path.join(model_dir, "model_config.json")
+    model_config = os.path.join(model_dir, "model.json")
     with open(model_config, "r") as f:
         config = json.load(f)
     vocab = config["vocabulary"]
