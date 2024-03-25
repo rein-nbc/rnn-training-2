@@ -10,7 +10,6 @@ Original file is located at
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 
-import glob
 import json
 import struct
 import base64
@@ -184,7 +183,7 @@ def get_text_from_dir(dir):
 
     list_files_recursive(dir)
 
-    for data_path in file_paths:
+    for data_path in tqdm(file_paths):
         if data_path.endswith(".txt"):
             text += get_text_from_file(data_path)
             text += "\n"

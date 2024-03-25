@@ -262,8 +262,6 @@ def main():
     with open(config_path, "r") as f:
         config = json.load(f)
 
-    embedding_dim = config["embedding_dim"]
-    rnn_units = config["rnn_units"]
     batch_size = config["batch_size"]
     seq_length = config["seq_length"]
 
