@@ -13,15 +13,11 @@ import time
 import json
 import argparse
 import glob
-from thefuzz import fuzz
-from thefuzz import process
 
 
 def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch inference")
-    parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
-    parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
-    parser.add_argument("--checkpoint-path", type =str, required = True, help="Path to the checkpoint file")
+    parser.add_argument("--model-dir", type=str, default = "./model_outputs", help="Path to the model directory")
     return parser.parse_args()
 
 def get_file_content(file_path):
@@ -249,52 +245,28 @@ def test_model(model, chars_from_ids, ids_from_chars, prompt, temperature=1.0):
 
     end = time.time()
     context = result[-1].numpy().decode('utf-8')
-    # result = ""
-    # word = ""
-    # i = 0
-    # while i < len(context) - 1:
-    #     if context[i + 1] == " " or context[i + 1] == "\n":
-    #         new_word = process.extract(word, collection, scorer=fuzz.ratio)[0][0]
-    #         result += new_word
-    #         result += context[i + 1]
-    #         word = ""
-    #         i = i + 2
-    #     else:
-    #         word += context[i]
-    #         i = i + 1
     print(context)
     print('\nRun time:', end - start)
 
 
 def main():
     args = parse_args()
-    # The embedding dimension
-    config_path = args.config_path
-    data_dir = args.data_dir
+    model_dir = args.model_dir
 
-    with open(config_path, "r") as f:
+    ckpt = os.path.join(model_dir, "model.h5")
+    model_config = os.path.join(model_dir, "model_config.json")
+    with open(model_config, "r") as f:
         config = json.load(f)
-
-    embedding_dim = config["embedding_dim"]
-    rnn_units = config["rnn_units"]
-    batch_size = config["batch_size"]
-    seq_length = config["seq_length"]
+    vocab = config["vocabulary"]
+    
+    chars_from_ids = tf.keras.layers.StringLookup(vocabulary=vocab, invert=False)
+    ids_from_chars = tf.keras.layers.StringLookup(vocabulary=vocab, invert=True)
 
     temperature = 0.7
     prompt = 'Harry'
     # prompt = ''
-
-    datasets = glob.glob(os.path.join(data_dir, "*"))
-    text = ""
-    for dataset in datasets:
-        text += get_text_from_dataset(dataset)
-        text += "\n"
-
-    dataset, chars_from_ids, ids_from_chars, text_from_ids = create_dataset_from_text(text, batch_size, seq_length)
-
-    # Length of the vocabulary in StringLookup Layer
     
-    model = tf.keras.models.load_model(args.checkpoint_path)
+    model = tf.keras.models.load_model(ckpt)
     print(model.summary())
     test_model(model, chars_from_ids, ids_from_chars, prompt, temperature)
 
