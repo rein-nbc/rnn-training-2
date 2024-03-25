@@ -170,12 +170,11 @@ def create_dataset_from_text(text, batch_size, seq_length):
 
 
 class OneStep(tf.keras.Model):
-  def __init__(self, model, chars_from_ids, ids_from_chars, temperature=1.0):
+  def __init__(self, model, vocab, temperature=1.0):
     super().__init__()
     self.temperature = temperature
     self.model = model
-    self.chars_from_ids = chars_from_ids
-    self.ids_from_chars = ids_from_chars
+    self.vocabulary = vocab
 
     # Create a mask to prevent "[UNK]" from being generated.
     skip_ids = self.ids_from_chars(['[UNK]'])[:, None]
@@ -184,14 +183,15 @@ class OneStep(tf.keras.Model):
         values=[-float('inf')]*len(skip_ids),
         indices=skip_ids,
         # Match the shape to the vocabulary
-        dense_shape=[len(ids_from_chars.get_vocabulary())])
+        dense_shape=[len(self.vocabulary)])
     self.prediction_mask = tf.sparse.to_dense(sparse_mask)
 
   @tf.function
   def generate_one_step(self, inputs):
     # Convert strings to token IDs.
     input_chars = tf.strings.unicode_split(inputs, 'UTF-8')
-    input_ids = self.ids_from_chars(input_chars).to_tensor()
+    input_ids = [self.vocabulary.index(char) for char in input_chars]
+    input_ids = tf.expand_dims(input_ids, 0)
     
     # Run the model.
     # predicted_logits.shape is [batch, char, next_char_logits]
@@ -227,10 +227,10 @@ def train_model(model, dataset, checkpoint_dir, epochs):
   model.fit(dataset, epochs=epochs, callbacks=[checkpoint_callback])
 
 
-def test_model(model, chars_from_ids, ids_from_chars, prompt, temperature=1.0):
+def test_model(model, vocab, prompt, temperature=1.0):
     # with open('/Users/vuonggiahuy/rnn-training-2/data/shakepeare1/shakespeare.json', 'r') as f:
     #    collection = json.load(f)
-    one_step_model = OneStep(model, chars_from_ids, ids_from_chars, temperature)
+    one_step_model = OneStep(model, vocab, temperature)
 
     start = time.time()
     next_char = tf.constant([prompt for _ in range(1024)])
@@ -259,16 +259,13 @@ def main():
         config = json.load(f)
     vocab = config["vocabulary"]
     
-    chars_from_ids = tf.keras.layers.StringLookup(vocabulary=vocab, invert=False)
-    ids_from_chars = tf.keras.layers.StringLookup(vocabulary=vocab, invert=True)
-
     temperature = 0.7
     prompt = 'Harry'
     # prompt = ''
     
     model = tf.keras.models.load_model(ckpt)
     print(model.summary())
-    test_model(model, chars_from_ids, ids_from_chars, prompt, temperature)
+    test_model(model, vocab, prompt, temperature)
 
 if __name__ == "__main__":
     main()
