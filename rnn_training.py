@@ -55,7 +55,7 @@ def create_dataset_from_text(text_list, seq_length):
         targets.append([vocab_to_index[sequence_out]])
     
     # reshape the input into a format compatible with LSTM layers
-    inputs = np.reshape(inputs, (len(inputs), seq_length, 1))/len(vocab)
+    inputs = np.reshape(inputs, (len(inputs), seq_length))
     targets = np.array(targets)  
     
     return inputs, targets, vocab_to_index
