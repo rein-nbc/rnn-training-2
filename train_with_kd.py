@@ -20,8 +20,6 @@ import numpy as np
 from kd import Distiller
 import tensorflow as tf
 
-VAL_PERCENT = 20
-
 def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
@@ -86,7 +84,7 @@ def create_model(config, teacher_checkpoint, student_checkpoint=None):
 
     student_model = tf.keras.models.Sequential([
         tf.keras.layers.InputLayer(input_shape=(sequence_length,)),
-        tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=sequence_length),
+        tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_shape=sequence_length),
         tf.keras.layers.LSTM(units=rnn_units),
         tf.keras.layers.Dense(vocab_size)
     ])
