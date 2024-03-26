@@ -215,8 +215,8 @@ def main():
     
     
     text = get_text_from_dir(data_dir)
-    
-    with open(os.path.join(output_dir, "data.pickle"), "w") as f:
+
+    with open(os.path.join(output_dir, "data.pickle"), "wb") as f:
         pickle.dump(text, f)
 
     text = list(text)
