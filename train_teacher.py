@@ -73,7 +73,7 @@ def create_model(config, model_path = None):
 
     model = tf.keras.models.Sequential([
         tf.keras.layers.InputLayer(input_shape=(sequence_length,)),
-        tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=128, input_length=sequence_length),
+        tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=128, input_shape=sequence_length),
         tf.keras.layers.LSTM(units=256, return_sequences=True),
         tf.keras.layers.LSTM(units=256, return_sequences=True),
         tf.keras.layers.LSTM(units=512, return_sequences=True),
