@@ -13,8 +13,6 @@ import time
 import json
 import argparse
 import glob
-from thefuzz import fuzz
-from thefuzz import process
 
 
 def parse_args():
