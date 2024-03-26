@@ -76,8 +76,8 @@ def create_model(config, model_path = None):
         tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=128, input_length=sequence_length),
         tf.keras.layers.LSTM(units=256, return_sequences=True),
         tf.keras.layers.LSTM(units=256, return_sequences=True),
-        tf.keras.layers.LSTM(units=256, return_sequences=True),
-        tf.keras.layers.LSTM(units=512),
+        tf.keras.layers.LSTM(units=512, return_sequences=True),
+        tf.keras.layers.LSTM(units=1024),
         tf.keras.layers.Dense(vocab_size)
     ])
     # load pretrained weight
@@ -225,7 +225,6 @@ def main():
     vocabulary = list(vocab_to_index.keys())
     config["vocab_size"] = len(vocabulary)
     model = create_model(config, ckpt)
-    model.summary()
 
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=os.path.join(output_dir, "model.h5"),
