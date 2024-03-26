@@ -19,8 +19,6 @@ from tqdm import tqdm
 import numpy as np 
 import tensorflow as tf
 
-VAL_PERCENT = 20
-
 def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
