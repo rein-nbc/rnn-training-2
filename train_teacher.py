@@ -25,7 +25,7 @@ def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
     parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
-    parser.add_argument("--output-path", type=str, default = "./model.json", help="Path to the output file")
+    parser.add_argument("--output-dir", type=str, default = "./output", help="Path to the output directory")
     parser.add_argument("--checkpoint-path", type =str, default=None, help="Path to the checkpoint file")
     return parser.parse_args()
 
@@ -204,22 +204,37 @@ def main():
     # The embedding dimension
     config_path = args.config_path
     data_dir = args.data_dir
-    output_path = args.output_path
+    output_dir = args.output_dir
     ckpt = args.checkpoint_path
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     with open(config_path, "r") as f:
         config = json.load(f)
     
+    
     text = get_text_from_dir(data_dir)
+    
+    with open(os.path.join(output_dir, "data.pickle"), "w") as f:
+        pickle.dump(text, f)
+
     text = list(text)
 
     X, y, vocab_to_index = create_dataset_from_text(text, config["seq_length"])
     vocabulary = list(vocab_to_index.keys())
     config["vocab_size"] = len(vocabulary)
     model = create_model(config, ckpt)
-        
-    model.fit(X, y, batch_size = config["batch_size"], epochs=config["epoch_num"])
-    
+    model.summary()
+
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=os.path.join(output_dir, "model.h5"),
+        save_best_only=True,
+        monitor="loss",
+        mode="min",
+        verbose = 1,
+    )   
+    model.fit(X, y, epochs=config["epoch_num"], batch_size = config["batch_size"], callbacks=[checkpoint_callback])
     weight_base64, compressed_config = get_model_for_export(model)
 
     inscription = {
@@ -229,7 +244,7 @@ def main():
         "weight_b64": weight_base64
     }
     inscription_json = json.dumps(inscription)
-    write_to_file(output_path, inscription_json)
+    write_to_file(os.path.join(output_dir, "model.json"), inscription_json)
     
 
 if __name__ == "__main__":
