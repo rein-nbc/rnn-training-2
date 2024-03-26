@@ -17,6 +17,7 @@ import pickle
 import argparse
 from tqdm import tqdm
 import numpy as np 
+from kd import Distiller
 import tensorflow as tf
 
 VAL_PERCENT = 20
@@ -25,8 +26,10 @@ def parse_args():
     parser = argparse.ArgumentParser("Entry script to launch training")
     parser.add_argument("--config-path", type=str, default = "./config.json", help="Path to the config file")
     parser.add_argument("--data-dir", type=str, default = "./data", help="Path to the data directory")
-    parser.add_argument("--output-path", type=str, default = "./model.json", help="Path to the output file")
-    parser.add_argument("--checkpoint-path", type =str, default=None, help="Path to the checkpoint file")
+    parser.add_argument("--output-dir", type=str, default = "./output", help="Path to the output directory")
+    parser.add_argument("--student-checkpoint-path", type =str, default=None, help="Path to the checkpoint file")
+    parser.add_argument("--teacher-checkpoint-path", type =str, required = True, help="Path to the teacher checkpoint file")
+
     return parser.parse_args()
 
 def get_file_content(file_path):
@@ -61,29 +64,43 @@ def create_dataset_from_text(text_list, seq_length):
     
     return inputs, targets, vocab_to_index
 
-def create_model(config, model_path = None):
-    if model_path is not None:
-        model = tf.keras.models.load_model(model_path)
-        return model
-    
+def create_model(config, teacher_checkpoint, student_checkpoint=None):
+    teacher_model = tf.keras.models.load_model(teacher_checkpoint)
+    if student_checkpoint is not None:
+        student_model = tf.keras.models.load_model(student_checkpoint)
+        distiller = Distiller(student=student_model, teacher=teacher_model)
+        distiller.compile(
+            optimizer=tf.keras.optimizers.Adam(),
+            metrics=[tf.keras.metrics.SparseCategoricalAccuracy()],
+            student_loss_fn=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+            distillation_loss_fn=tf.keras.losses.KLDivergence(),
+            alpha=0.1,
+            temperature=10,
+        )
+        return distiller
+
     embedding_dim = config["embedding_dim"]
     rnn_units = config["rnn_units"]
     vocab_size = config["vocab_size"]
     sequence_length = config["seq_length"]
 
-    model = tf.keras.models.Sequential([
+    student_model = tf.keras.models.Sequential([
         tf.keras.layers.InputLayer(input_shape=(sequence_length,)),
         tf.keras.layers.Embedding(input_dim=vocab_size, output_dim=embedding_dim, input_length=sequence_length),
         tf.keras.layers.LSTM(units=rnn_units),
         tf.keras.layers.Dense(vocab_size)
     ])
-    # load pretrained weight
-    loss = tf.losses.SparseCategoricalCrossentropy(from_logits=True)
-    optimizer = tf.optimizers.Adam(learning_rate=0.001)
-    model.compile(optimizer = optimizer, loss = loss, metrics=['accuracy'])
 
-    model.summary()
-    return model
+    distiller = Distiller(student=student_model, teacher=teacher_model)
+    distiller.compile(
+        optimizer=tf.keras.optimizers.Adam(),
+        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()],
+        student_loss_fn=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        distillation_loss_fn=tf.keras.losses.KLDivergence(),
+        alpha=0.1,
+        temperature=10,
+    )
+    return distiller
 
 def compressConfig(data):
     layers = []
@@ -201,21 +218,37 @@ def main():
     # The embedding dimension
     config_path = args.config_path
     data_dir = args.data_dir
-    output_path = args.output_path
-    ckpt = args.checkpoint_path
+    output_dir = args.output_dir
+    student_ckpt = args.student_checkpoint_path
+    teacher_ckpt = args.teacher_checkpoint_path
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     with open(config_path, "r") as f:
         config = json.load(f)
     
     text = get_text_from_dir(data_dir)
+
+    with open(os.path.join(output_dir, "data.pickle"), "wb") as f:
+        pickle.dump(text, f)
+
     text = list(text)
 
     X, y, vocab_to_index = create_dataset_from_text(text, config["seq_length"])
     vocabulary = list(vocab_to_index.keys())
     config["vocab_size"] = len(vocabulary)
-    model = create_model(config, ckpt)
+    model = create_model(config, teacher_ckpt, student_ckpt)
+
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=os.path.join(output_dir, "model.h5"),
+        save_best_only=True,
+        monitor="loss",
+        mode="min",
+        verbose = 1,
+    )
         
-    model.fit(X, y, batch_size = config["batch_size"], epochs=config["epoch_num"])
+    model.fit(X, y, batch_size = config["batch_size"], epochs=config["epoch_num"], callbacks=[checkpoint_callback])
     
     weight_base64, compressed_config = get_model_for_export(model)
 
@@ -226,7 +259,7 @@ def main():
         "weight_b64": weight_base64
     }
     inscription_json = json.dumps(inscription)
-    write_to_file(output_path, inscription_json)
+    write_to_file(os.path.join(output_dir, "model.json"), inscription_json)
     
 
 if __name__ == "__main__":

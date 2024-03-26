@@ -51,3 +51,9 @@ class Distiller(keras.Model):
 
     def call(self, x):
         return self.student(x)
+    
+    def get_weights(self):
+        return self.student.get_weights()
+
+    def to_json(self):
+        return self.student.to_json()
