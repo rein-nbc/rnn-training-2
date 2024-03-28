@@ -42,7 +42,7 @@ def create_dataset_from_text(text_list, seq_length):
     # The unique characters in the file
     vocab = sorted(set(item for item in text_list))
     # add [UNK] token
-    vocab.append("[UNK]")
+    vocab.insert(0, "[UNK]")
     vocab_to_index = dict((note, number) for number, note in enumerate(vocab)) 
 
     inputs = []
@@ -181,7 +181,7 @@ def get_text_from_dir(dir):
     list_files_recursive(dir)
 
     for data_path in tqdm(file_paths):
-        if data_path.endswith(".txt"):
+        if data_path.endswith(".txt") or data_path.endswith(".sol"):
             text += get_text_from_file(data_path)
             text += "\n"
         elif data_path.endswith(".pickle"):

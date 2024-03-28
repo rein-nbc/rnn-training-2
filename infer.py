@@ -171,15 +171,23 @@ def create_dataset_from_text(text, batch_size, seq_length):
 
 
 def generate_charactor(prompt, vocab, model, seq_length = 40, to_generate = 10):
+    ids_from_chars = tf.keras.layers.StringLookup(vocabulary=list(vocab), mask_token=None)
+
+    chars_from_ids = tf.keras.layers.StringLookup(
+        vocabulary=ids_from_chars.get_vocabulary(), invert=True, mask_token=None)
+
     input_chars = list(prompt)
     input_chars = input_chars[-seq_length:]
-    for i in range(seq_length - len(input_notes)):
-        input_notes.insert(0, np.random.choice(vocab))
+    for i in range(seq_length - len(input_chars)):
+        input_chars.insert(0, np.random.choice(vocab[1:]))
     prediction_output = []
 
     temperature = 1.0
     for i in range(to_generate):
-        prediction_input = np.array(input_notes).reshape(1, seq_length)
+        print(input_chars)
+        input_ids = ids_from_chars([input_chars])
+
+        prediction_input = np.array(input_ids).reshape(1, seq_length)
         prediction_logits = model.predict(prediction_input)
 
         prediction_logits = prediction_logits / temperature
@@ -189,7 +197,7 @@ def generate_charactor(prompt, vocab, model, seq_length = 40, to_generate = 10):
         # print(prediction)
 
         prediction_output.append(vocab[prediction[0]])
-        input_notes = input_notes[1:] + [vocab[prediction[0]]]
+        input_chars = input_chars[1:] + [vocab[prediction[0]]]
 
     return prediction_output
 
@@ -216,14 +224,18 @@ def main():
     with open(model_config, "r") as f:
         config = json.load(f)
     vocab = config["vocabulary"]
+
+    config["seq_length"] = 20
     
     temperature = 0.7
-    prompt = 'Harry'
+    prompt = 'contract'
     
     
     model = tf.keras.models.load_model(ckpt)
     print(model.summary())
-    generated_prompt = generate_charactor(prompt, vocab, model, seq_length = config["seq_length"], to_generate = 100)
+    generated_chars = generate_charactor(prompt, vocab, model, seq_length = config["seq_length"], to_generate = 1000)
+
+    print(prompt + ''.join(generated_chars))
     
 
 if __name__ == "__main__":
