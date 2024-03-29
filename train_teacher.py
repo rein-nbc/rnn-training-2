@@ -186,7 +186,7 @@ def get_text_from_dir(dir):
     list_files_recursive(dir)
 
     for data_path in tqdm(file_paths):
-        if data_path.endswith(".txt"):
+        if data_path.endswith(".txt") or data_path.endswith(".sol"):
             text += get_text_from_file(data_path)
             text += "\n"
         elif data_path.endswith(".pickle"):
